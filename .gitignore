@@ -160,4 +160,5 @@ cython_debug/
 #.idea/
 
 models/
+memory_stream/
 notes.txt
