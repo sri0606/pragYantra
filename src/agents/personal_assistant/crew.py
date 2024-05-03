@@ -18,7 +18,8 @@ class PersonalAssistantCrew():
     def personal_assistant(self) -> Agent:
         return Agent(
             config=self.agents_config["personal_assistant"],
-            llm=self.llm
+            llm=self.llm,
+            max_iter=3
         )
     
     # @agent
@@ -35,12 +36,12 @@ class PersonalAssistantCrew():
     #         llm=self.llm
     #     )
     
-    @task
-    def answer_user_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["answer_user_task"],
-            agent=self.personal_assistant()
-        )
+    # @task
+    # def answer_user_task(self) -> Task:
+    #     return Task(
+    #         config=self.tasks_config["answer_user_task"],
+    #         agent=self.personal_assistant()
+    #     )
     
     @task
     def converse_user_task(self) -> Task:
@@ -49,19 +50,19 @@ class PersonalAssistantCrew():
             agent=self.personal_assistant()
         )
     
-    @task
-    def ask_user_question_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["ask_user_question_task"],
-            agent=self.personal_assistant()
-        )
+    # @task
+    # def ask_user_question_task(self) -> Task:
+    #     return Task(
+    #         config=self.tasks_config["ask_user_question_task"],
+    #         agent=self.personal_assistant()
+    #     )
     
-    @task
-    def translate_message_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["translate_message_task"],
-            agent=self.personal_assistant()
-        )
+    # @task
+    # def translate_message_task(self) -> Task:
+    #     return Task(
+    #         config=self.tasks_config["translate_message_task"],
+    #         agent=self.personal_assistant()
+    #     )
     
     @crew
     def crew(self) -> Crew:
