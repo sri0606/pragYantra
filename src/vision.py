@@ -1,5 +1,5 @@
 import threading
-from utils.vision_aid import VisionAid
+from utils.aid_vision import VisionAid
 
 class LiveVision:
     """
@@ -10,39 +10,39 @@ class LiveVision:
         Constructor
         """
         self._eyes = VisionAid(stop_event_wait_time=5, save_to_json_interval=3)
-        self.thread = None
-        self.stop_event = threading.Event()
+        self._thread = None
+        self._stop_event = threading.Event()
 
     def start(self):
         """
         Starts the vision thread if it is not already running.
         """
-        if self.thread is not None and self.thread.is_alive():
+        if self._thread is not None and self._thread.is_alive():
           print("Vision is already running")
           return
 
-        self.thread = threading.Thread(target=self._eyes.get_visual_context, args=(self.stop_event,))
-        self.thread.start()
+        self._thread = threading.Thread(target=self._eyes.get_visual_context, args=(self._stop_event,))
+        self._thread.start()
 
         print("Vision thread started")
 
 
-    def stop(self):
+    def terminate(self):
         """
         Stops the vision thread if it is running.
         """
-        if self.thread is None or not self.thread.is_alive():
+        if self._thread is None or not self._thread.is_alive():
             return
 
         # Signal the Vision thread to stop
-        self.stop_event.set()
+        self._stop_event.set()
 
         # Wait for the Vision thread to finish
-        self.thread.join()
+        self._thread.join()
 
         # Reset the stop event so we can start the Vision again
-        self.stop_event.clear()
-
+        self._stop_event.clear()
+        
         print("Vision thread stopped.")
 
 

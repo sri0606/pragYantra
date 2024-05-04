@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import time
-
+import numpy as np
 # def get_classifier_labels():
 #     """
 #     Get the classifier labels
@@ -23,9 +23,9 @@ class ImageProcessor:
     """
     Image helper class for VisionAid and Vision classes
     """
-    model = VisionEncoderDecoderModel.from_pretrained("models/gpt2-image-captioning")
-    feature_extractor = ViTImageProcessor.from_pretrained("models/gpt2-image-captioning")
-    tokenizer = AutoTokenizer.from_pretrained("models/gpt2-image-captioning")
+    model = VisionEncoderDecoderModel.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
+    feature_extractor = ViTImageProcessor.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
+    tokenizer = AutoTokenizer.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -99,7 +99,7 @@ class ImageProcessor:
         """
         pass
 
-    def get_context(self,image_data_list):
+    def get_context(self,image_data):
         """
         Get the context of the visuals
         """
@@ -107,11 +107,38 @@ class ImageProcessor:
         num_beams = 4
         gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
 
-        visual_context = self.__predict_image_caption(image_data_list,gen_kwargs)
+        visual_context = self.__predict_image_caption(image_data,gen_kwargs)
 
         return visual_context
     
-    def __predict_image_caption(self, image_data_list, gen_kwargs):
+
+    def numpy_to_pil(self, image, rescale=None):
+        """
+        Converts :obj:`image` to a PIL Image. Optionally rescales it and puts the channel dimension back as the last
+        axis if needed.
+
+        Args:
+            image (:obj:`PIL.Image.Image` or :obj:`numpy.ndarray` or :obj:`torch.Tensor`):
+                The image to convert to the PIL Image format.
+            rescale (:obj:`bool`, `optional`):
+                Whether or not to apply the scaling factor (to make pixel values integers between 0 and 255). Will
+                default to :obj:`True` if the image type is a floating type, :obj:`False` otherwise.
+        """
+
+        if isinstance(image, np.ndarray):
+            if rescale is None:
+                # rescale default to the array being of floating type.
+                rescale = isinstance(image.flat[0], np.floating)
+            # If the channel as been moved to first dim, we put it back at the end.
+            if image.ndim == 3 and image.shape[0] in [1, 3]:
+                image = image.transpose(1, 2, 0)
+            if rescale:
+                image = image * 255
+            image = image.astype(np.uint8)
+            return PILImage.fromarray(image)
+        return image
+    
+    def __predict_image_caption(self, image_data, gen_kwargs):
         """
         Predicts image captions for a list of image data.
 
@@ -122,22 +149,18 @@ class ImageProcessor:
         Returns:
             list: A list of predicted image captions.
         """
-        images = []
-        for image_data in image_data_list:
-            i_image = PILImage.fromarray(image_data)
-            if i_image.mode != "RGB":
-                i_image = i_image.convert(mode="RGB")
 
-            images.append(i_image)
+        pil_image = self.numpy_to_pil(image_data)
 
-        pixel_values = self.feature_extractor(images=images, return_tensors="pt").pixel_values
+        pixel_values = self.feature_extractor(images=[pil_image], return_tensors="pt").pixel_values
         pixel_values = pixel_values.to(self.device)
 
-        output_ids = self.model.generate(pixel_values, **gen_kwargs, pad_token_id=None)
+        output_ids = self.model.generate(pixel_values, **gen_kwargs,pad_token_id=self.tokenizer.eos_token_id)
 
         preds = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)
         preds = [pred.strip() for pred in preds]
         return preds
+
 
 class VisionAid:
     """
@@ -161,6 +184,7 @@ class VisionAid:
         Capture an image from the camera
         """
         ret, frame = self._camera.read()  # Read a frame from the camera
+        frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         if not ret:
             raise IOError("Cannot read frame from camera")
         return frame
@@ -196,7 +220,7 @@ class VisionAid:
         Returns:
             None
         """
-        transcript_dir_path = "memory_stream/vision_logs/"
+        vision_log_dir_path = "memory_stream/vision_logs/"
 
         # Initialize a timer
         next_save_time = datetime.now() + timedelta(seconds=self.save_to_json_interval)
@@ -217,7 +241,7 @@ class VisionAid:
             context = self.__get_context_from_image(image)
             context_end_time = time.time()
             print(f"Got context in {context_end_time - context_start_time} seconds")
-
+            print(context)
             vision_log[current_hour] = [{now.strftime("%H%M%S"): context}]
 
             if current_hour not in vision_log:
@@ -226,7 +250,7 @@ class VisionAid:
             if now >= next_save_time:
                 date_string = now.strftime("%Y%m%d")
                 filename = f"{date_string}_vision.json"
-                filepath = os.path.join(transcript_dir_path, filename)
+                filepath = os.path.join(vision_log_dir_path, filename)
 
                 if os.path.exists(filepath):
                     with open(filepath, 'r') as f:
@@ -252,15 +276,12 @@ class VisionAid:
             # Wait for 5 seconds or until the stop event is set
             stop_event.wait(self.stop_event_wait_time)    
 
-    def __get_context_from_image(self, image_paths):
+    def __get_context_from_image(self, images_data):
         """
         Get the context of the visuals
         """
-        context = []
-        for image_path in image_paths:
-            # self.image.load(image_path)
-            context.append(self.image_processor.get_context(image_path))
-        return context
+        contexts = self.image_processor.get_context(images_data)
+        return contexts
     
     def __del__(self):
         """
@@ -278,3 +299,5 @@ class VisionAid:
             'text_detection': self.image.detect_text(),
         }
         return results
+    
+
