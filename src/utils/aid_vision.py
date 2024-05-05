@@ -6,7 +6,6 @@ from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoToken
 from datetime import datetime, timedelta
 import json
 import os
-import time
 import numpy as np
 # def get_classifier_labels():
 #     """
@@ -230,19 +229,10 @@ class VisionAid:
             now = datetime.now()
             current_hour = now.strftime("%H")
         
-            print("Getting image...")
-            image_start_time = time.time()
             image = self.get_image()
-            image_end_time = time.time()
-            print(f"Got image in {image_end_time - image_start_time} seconds")
 
-            print("Getting context from image...")
-            context_start_time = time.time()
             context = self.__get_context_from_image(image)
-            context_end_time = time.time()
-            print(f"Got context in {context_end_time - context_start_time} seconds")
-            print(context)
-            vision_log[current_hour] = [{now.strftime("%H%M%S"): context}]
+            vision_log[current_hour] = [(now.strftime("%H%M%S"),context)]
 
             if current_hour not in vision_log:
                     vision_log[current_hour] = []
