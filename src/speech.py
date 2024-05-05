@@ -36,6 +36,19 @@ class LiveSpeech:
         self._thread = None
         self._queue = queue.Queue()
         self._stop_event = threading.Event()
+        self.ears_pause_event = None
+
+    def set_ears_pause_event(self, event: threading.Event):
+        """
+        Set the ears pause event.
+
+        Parameters:
+            event (Event): The event to pause the ears.
+
+        Returns:
+            None
+        """
+        self.ears_pause_event = event
 
     def _process_speech(self):
         """
@@ -71,6 +84,11 @@ class LiveSpeech:
             None
         """
         pygame.mixer.music.load(filename)
+
+        #pauses hearing ability so that own speech is not transcribed
+        if self.ears_pause_event is not None:
+            self.ears_pause_event.set()
+
         pygame.mixer.music.play()
 
         while pygame.mixer.music.get_busy():
@@ -79,6 +97,10 @@ class LiveSpeech:
                 break
 
             time.sleep(0.1)
+        
+        #resumes hearing ability
+        if self._stop_event is not None:
+            self.ears_pause_event.clear() 
 
     def start(self):
         """
@@ -98,6 +120,15 @@ class LiveSpeech:
 
         print("Speech thread started")
 
+    def is_speaking(self):
+        """
+        Checks if the speech is running.
+
+        Returns:
+            bool: True if the speech is running, False otherwise.
+        """
+        return pygame.mixer.music.get_busy()
+    
     def speak(self, text):
         """
         Adds the given text to the speech queue.
@@ -108,7 +139,7 @@ class LiveSpeech:
         Returns:
             None
         """
-        self.shut_up()
+        # self.shut_up()
         self._queue.put(text)
 
     def pause(self):

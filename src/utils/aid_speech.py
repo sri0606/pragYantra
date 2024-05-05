@@ -6,7 +6,10 @@ class Speech:
     Speech class to handle all speech related tasks
     """
     def __init__(self):
-        self._speech = None
+        """
+        Constructor
+        """
+        pass
 
     def speak_instant(self, text):
         raise NotImplementedError("Subclass must implement text_to_speech method")
