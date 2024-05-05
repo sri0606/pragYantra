@@ -1,5 +1,5 @@
 import threading
-from utils.aid_speech import Pyttsx3Speech
+from utils.aid_speech import Pyttsx3Speech,ElevenLabsSpeech, FacebookMMS
 import queue
 import os
 import pygame
@@ -17,22 +17,30 @@ class LiveSpeech:
         _stop_event (Event): The event to signal the speech processing thread to stop.
     """
 
-    def __init__(self):
+    def __init__(self,speaker_model=None):
         """
-        Initializes the Speech class.
+        Initializes the LiveSpeech class.
 
-        This method initializes the Speech class by initializing the Pygame mixer,
-        creating an instance of the Pyttsx3Speech class for speech synthesis,
+        This method initializes the Speech class for speech synthesis,
         initializing the thread, queue, and stop event for managing speech playback.
 
         Parameters:
-            None
+            speaker_model (str): The speech synthesis engine to use. Default is None. 
+                            Current Options are "pyttsx3", "11labs", and "facebook-mms".
 
         Returns:
             None
         """
         pygame.mixer.init()
-        self._speaker = Pyttsx3Speech()
+        if speaker_model is None or speaker_model == "pyttsx3":
+            self._speaker = Pyttsx3Speech()   
+
+        elif speaker_model == "11labs":
+            self._speaker = ElevenLabsSpeech()
+
+        elif speaker_model == "facebook-mms":
+            self._speaker = FacebookMMS()
+
         self._thread = None
         self._queue = queue.Queue()
         self._stop_event = threading.Event()

@@ -38,7 +38,7 @@ class Pyttsx3Speech(Speech):
     def __init__(self):
         super().__init__()
         self.speech_engine = pyttsx3.init()
-        self.speech_rate=200
+        self.speech_engine.setProperty('rate', 190)
 
     def speak_instant(self,text:str):
         self.speech_engine.say(text)

@@ -18,7 +18,14 @@ def detect_faces(image_path):
     
     # Detect faces in the image
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    
+
+    # Draw rectangles around the faces
+    for (x, y, w, h) in faces:
+        cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+    # Save the image
+    cv2.imwrite('detected_faces.png', image)
+
     return faces
 
 def detect_objects(image_path):
@@ -65,5 +72,44 @@ def extract_text_handwritten(image_path):
     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return generated_text
 
+import time
 
+if __name__ == '__main__':
+    image_path="example.jpg"
 
+    # Test the face detection function
+    start_time = time.time()
+    faces = detect_faces(image_path)
+    end_time = time.time()
+    print(f"Face detection took {end_time - start_time} seconds")
+    print(faces)
+    
+    print("\n\n====================\n\n")
+    # Test the object detection function
+    # start_time = time.time()
+    # detections = detect_objects(image_path)
+    # end_time = time.time()
+    # print(f"Object detection took {end_time - start_time} seconds")
+    # print(detections)
+    
+    # Test the text detection function
+    start_time = time.time()
+    text = detect_text(image_path)
+    end_time = time.time()
+    print(f"Text detection took {end_time - start_time} seconds")
+    print(text)
+    print("\n\n====================\n\n")
+    # Test the text extraction function
+    start_time = time.time()
+    extracted_text = extract_text(image_path)
+    end_time = time.time()
+    print(f"Text extraction took {end_time - start_time} seconds")
+    print(extracted_text)
+    print("\n\n====================\n\n")
+    # Test the handwritten text extraction function
+    start_time = time.time()
+    extracted_handwritten_text = extract_text_handwritten(image_path)
+    end_time = time.time()
+    print(f"Handwritten text extraction took {end_time - start_time} seconds")
+    print(extracted_handwritten_text)
+    print("\n\n====================\n\n")

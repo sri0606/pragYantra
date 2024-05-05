@@ -141,7 +141,7 @@ class Manas:
         self.interpreter = Groq(model_name="llama3-70b-8192")
         self.ears = LiveTranscriber()
         self.eyes = LiveVision()
-        self.speak = LiveSpeech()
+        self.speak = LiveSpeech(speaker_model="pyttsx3")
         self.memory = LiveMemory(latest_time_threshold=7)
         self.alive = False
         return
