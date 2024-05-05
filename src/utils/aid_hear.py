@@ -11,13 +11,43 @@ from time import sleep
 from sys import platform
 import json
 
+class TalkingState:
+    """
+    State of talking
+    """
+    def __init__(self):
+        #check if someone is talking
+        self.is_talking = False
+        # self.id_person_talking = None
+
+    def set_is_talking(self, is_talking,person_id=None):
+        """
+        Set the state of the talking.
+
+        Parameters:
+        is_talking (bool): The state of the talking.
+        person_id (int): The id of the person talking.
+        """
+        self.is_talking = is_talking
+
+    def is_someone_talking(self):
+        """
+        Check if someone is talking.
+
+        Returns:
+        bool: True if someone is talking, False otherwise.
+        """
+        return self.is_talking
+
 ####  inspired from https://github.com/davabase/whisper_real_time   #####
-def live_transcribe(model="medium", non_english=False, energy_threshold=1000, 
-                    record_timeout=2, phrase_timeout=3, default_microphone='pulse',stop_event=None):
+def live_transcribe(talking_state: TalkingState,model="medium", non_english=False, energy_threshold=1000, 
+                    record_timeout=2, phrase_timeout=3, default_microphone='pulse',
+                    stop_event=None,pause_event=None,):
     """
     Transcribes audio from the microphone in real time.
 
     Parameters:
+    talking_state (TalkingState): The state of the talking.
     model (str): The model to use for transcription. Default is "medium".
     non_english (bool): Whether to use a non-English model. Default is False.
     energy_threshold (int): The energy level threshold for the speech recognizer. Default is 1000.
@@ -25,6 +55,7 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
     phrase_timeout (int): The maximum time to wait for a new phrase in seconds. Default is 3.
     default_microphone (str): The default microphone to use. Default is 'pulse'.
     stop_event (threading.Event): An event that will be set when the transcription should stop.
+    pause_event (threading.Event): An event that will be set when the transcription should pause, typically when LiveSpeech is talking.
     """
 
     # The last time a recording was retrieved from the queue.
@@ -37,6 +68,7 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
     # Definitely do this, dynamic energy compensation lowers the energy threshold dramatically to a point where the SpeechRecognizer never stops recording.
     recorder.dynamic_energy_threshold = False
 
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     # Important for linux users.
     # Prevents permanent application hang and crash by using the wrong Microphone
     if 'linux' in platform:
@@ -57,7 +89,7 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
     # Load / Download model
     if model != "large" and not non_english:
             model = model + ".en"
-    audio_model = whisper.load_model(os.path.abspath(f"models/{model}.pt"))
+    audio_model = whisper.load_model(os.path.join(script_dir,"..", "models", f"{model}.pt"))
 
     with source:
         recorder.adjust_for_ambient_noise(source)
@@ -71,14 +103,27 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
         data = audio.get_raw_data()
         data_queue.put(data)
 
+        # # Convert the audio data to an array of integers
+        # audio_int = np.frombuffer(data, dtype=np.int16)
+
+        # ### rough implementation of live VAD
+        # # Calculate the energy (volume) of the audio data
+        # energy = np.sum(audio_int**2)
+
+        # # If the energy is above the threshold, someone is talking
+        # if energy > recorder.energy_threshold:
+        #     talking_state.set_is_talking(True)
+        # else:
+        #     talking_state.set_is_talking(False)
+
     # Create a background thread that will pass us raw audio bytes.
     # We could do this manually but SpeechRecognizer provides a nice helper.
     recorder.listen_in_background(source, record_callback, phrase_time_limit=record_timeout)
 
     # Cue the user that we're ready to go.
-    print("Model loaded.\n")
-    # Assume transcript_dir_path is the directory where you want to save the transcripts
-    transcript_dir_path = "memory_stream/hearing_logs/"
+    print("Whisper Model loaded.\n")
+
+    transcript_dir_path = os.path.join(script_dir,"..", "memory_stream", "hearing_logs")
 
     # Initialize a timer
     next_save_time = datetime.now() + timedelta(seconds=3)
@@ -90,6 +135,9 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
         # Check the stop event at the start of each loop iteration
         if stop_event is not None and stop_event.is_set():
             break
+        # Check the pause event at the start of each loop iteration
+        if pause_event is not None and pause_event.is_set():
+            continue
         try:
             now = datetime.now()
             current_hour = now.strftime("%H")
@@ -112,7 +160,7 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
                     transcriptions[current_hour] = []
 
                 if phrase_complete:
-                    transcriptions[current_hour] = [{now.strftime("%H%M%S"): text}]
+                    transcriptions[current_hour] = [(now.strftime("%H%M%S"), text)]
                     text = ''
 
                 if now >= next_save_time:
@@ -145,3 +193,7 @@ def live_transcribe(model="medium", non_english=False, energy_threshold=1000,
                 sleep(0.25)
         except KeyboardInterrupt:
             break
+
+if __name__ == '__main__':
+    talking_state = TalkingState()
+    live_transcribe(talking_state, model='base',non_english=False)
