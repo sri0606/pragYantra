@@ -194,11 +194,12 @@ class FacebookMMS(Speech):
         super().__init__()
         model_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models/facebook_mms_tts_eng")
         try:
+            #try loading the model from the projects local src/models directory
             self.model = VitsModel.from_pretrained(model_dir)
             self.tokenizer = VitsTokenizer.from_pretrained(model_dir)
-        except Exception as e:
-            print(f"Failed to load Facebook MMS TTS model or tokenizer: {e}")
-            raise
+        except:
+            self.model = VitsModel.from_pretrained("facebook/mms-tts-eng")
+            self.tokenizer = VitsTokenizer.from_pretrained("facebook/mms-tts-eng")
     
     def __get_speech_data(self, text):
         """

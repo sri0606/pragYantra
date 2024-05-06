@@ -1,6 +1,5 @@
 import threading
 from utils.aid_hear import live_transcribe, TalkingState
-from multiprocessing import Value
 
 class LiveTranscriber:
     """

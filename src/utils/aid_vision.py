@@ -22,10 +22,17 @@ class ImageProcessor:
     """
     Image helper class for VisionAid and Vision classes
     """
-    model = VisionEncoderDecoderModel.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
-    feature_extractor = ViTImageProcessor.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
-    tokenizer = AutoTokenizer.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
-
+    try:
+        #try loading from projects local models dir
+        model = VisionEncoderDecoderModel.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
+        feature_extractor = ViTImageProcessor.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
+        tokenizer = AutoTokenizer.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
+    except:
+        #load from huggingface
+        model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        tokenizer = AutoTokenizer.from_pretrained("nlp-connect/vit-gpt2-image-captioning")
+        
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     

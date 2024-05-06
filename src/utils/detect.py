@@ -1,9 +1,7 @@
 import cv2
-import numpy as np
 import tensorflow as tf
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+# from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 from PIL import Image
-import requests
 import easyocr
 
 def detect_faces(image_path):
@@ -58,19 +56,19 @@ def extract_text(image_path):
     
     return result
 
-def extract_text_handwritten(image_path):
+# def extract_text_handwritten(image_path):
     
-    # Load the processor and model from a specific folder
-    processor = TrOCRProcessor.from_pretrained('../models/trOCR')
-    model = VisionEncoderDecoderModel.from_pretrained('../models/trOCR')
+#     # Load the processor and model from a specific folder
+#     processor = TrOCRProcessor.from_pretrained('../models/trOCR')
+#     model = VisionEncoderDecoderModel.from_pretrained('../models/trOCR')
 
-    image = Image.open(image_path).convert("RGB")
+#     image = Image.open(image_path).convert("RGB")
 
-    pixel_values = processor(image, return_tensors="pt").pixel_values
-    generated_ids = model.generate(pixel_values)
+#     pixel_values = processor(image, return_tensors="pt").pixel_values
+#     generated_ids = model.generate(pixel_values)
 
-    generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    return generated_text
+#     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+#     return generated_text
 
 import time
 
@@ -107,9 +105,9 @@ if __name__ == '__main__':
     print(extracted_text)
     print("\n\n====================\n\n")
     # Test the handwritten text extraction function
-    start_time = time.time()
-    extracted_handwritten_text = extract_text_handwritten(image_path)
-    end_time = time.time()
-    print(f"Handwritten text extraction took {end_time - start_time} seconds")
-    print(extracted_handwritten_text)
-    print("\n\n====================\n\n")
+    # start_time = time.time()
+    # extracted_handwritten_text = extract_text_handwritten(image_path)
+    # end_time = time.time()
+    # print(f"Handwritten text extraction took {end_time - start_time} seconds")
+    # print(extracted_handwritten_text)
+    # print("\n\n====================\n\n")

@@ -89,7 +89,11 @@ def live_transcribe(talking_state: TalkingState,model="medium", non_english=Fals
     # Load / Download model
     if model != "large" and not non_english:
             model = model + ".en"
-    audio_model = whisper.load_model(os.path.join(script_dir,"..", "models", f"{model}.pt"))
+    try:
+        #try loading from project's local models dir
+        audio_model = whisper.load_model(os.path.join(script_dir,"..", "models", f"{model}.pt"))
+    except FileNotFoundError:
+        audio_model = whisper.load_model(model)
 
     with source:
         recorder.adjust_for_ambient_noise(source)
