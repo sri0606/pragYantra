@@ -162,3 +162,4 @@ cython_debug/
 models/
 memory_stream/
 notes.txt
+*.pkl
