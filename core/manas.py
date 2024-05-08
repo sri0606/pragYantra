@@ -1,18 +1,24 @@
-from llama_cpp import Llama
-from hear import LiveTranscriber
-from vision import LiveVision
-from speech import LiveSpeech
-from memory import LiveMemory
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
 import time 
 import os
+import threading
+from llama_cpp import Llama as LlamaCPP
+from core.hear import LiveTranscriber
+from core.vision import LiveVision
+from core.speech import LiveSpeech
+from memory.memory import LiveMemory
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from dotenv import load_dotenv
+from . import MODELS_DIR
+
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 class Interpreter:
     """
     Interpreter class
     """
-    def __init__(self):
+    def __init__(self,model_name):
         """
         Constructor
         """
@@ -35,14 +41,15 @@ class Llama(Interpreter):
     Llama class is an offline interpreter. It can be slow depending on the model size and device specs.
     It inherits from the Interpreter base class and provides an implementation for the get_response method.
     """
-    def __init__(self, model_path="./models/llama3_8B.gguf"):
+    def __init__(self,model_name="llama3_8B"):
         """
         Constructor for the Llama class.
 
         Args:
-            model_path (str): Path to the model file. Defaults to "./models/llama3_8B.gguf".
+            model_name (str): Model filename. Defaults to "llama3_8B".
         """
-        self._llama = Llama(model_path=model_path)
+        model_path=os.path.join(MODELS_DIR,model_name+".gguf")
+        self._llama = LlamaCPP(model_path=model_path)
     
     def get_response(self, prompt):
         """
@@ -92,9 +99,6 @@ class Groq(Interpreter):
         __init__(model_name, groq_api_key, temperature=0): Initializes the Groq interpreter.
         get_response(prompt): Sends a prompt to the Groq API and returns the response.
 
-    Example usage:
-        groq = Groq(model_name='my_model', groq_api_key='my_api_key', temperature=0.5)
-        response = groq.get_response('Hello, how are you?')
     """
     def __init__(self, model_name, groq_api_key=None, temperature=0):
         """
@@ -107,8 +111,12 @@ class Groq(Interpreter):
         """
         if groq_api_key is None:
             groq_api_key = os.getenv("GROQ_API_KEY")
-
-        self._groq = ChatGroq(temperature=temperature, model_name=model_name, groq_api_key=groq_api_key)
+        try:
+            self._groq = ChatGroq(temperature=temperature, model_name=model_name, groq_api_key=groq_api_key)
+            self.get_response("Checking if the model is initialized correctly.")
+        except Exception as e:
+            print("Make sure the model name is correct and you have the Groq API key.\nCheck the supported models here: https://console.groq.com/docs/models")
+            raise e
     
     def get_response(self, prompt):
         """
@@ -134,21 +142,35 @@ class Manas:
     It can see, hear, speak, and understand the world around it.
     """
 
-    def __init__(self):
+    def __init__(self,interpreter_model,offline_mode=False,groq_api_key=None,speaker_model="pyttsx3"):
         """
         Constructor
+
+        Args:
+            offline_mode (bool): Whether to run in offline mode. Default is False.
+            interpreter_model (str): The name of the model to use.
+
+        IF running in offline mode, the Llama model will be used for interpretation. 
+        Make sure you have the model file in the models directory.
         """
-        self.interpreter = Groq(model_name="llama3-70b-8192")
+        if not offline_mode:
+            print("Running in online mode. Make sure the model name is correct and you have the Groq API key.")
+            self.interpreter = Groq(model_name=interpreter_model, groq_api_key=groq_api_key)
+        else:
+            print("Running in offline mode.\nMake sure you have the quantized GGUF model file in the models directory")
+            self.interpreter = Llama(model_name=interpreter_model)
+        
         self.ears = LiveTranscriber()
         self.eyes = LiveVision()
-        self.speak = LiveSpeech(speaker_model="pyttsx3")
+        self.speak = LiveSpeech(speaker_model=speaker_model)
         self.memory = LiveMemory(latest_time_threshold=7)
         self.alive = False
+        self.live_thread = None
         return
 
-    def start(self):
+    def setup(self):
         """
-        Start the Manas
+        Setup all the core sense components
         """
         self.ears.start()
         self.eyes.start()
@@ -156,6 +178,13 @@ class Manas:
         self.alive = True
         return
 
+    def start(self):
+        """
+        Start the Manas
+        """
+        self.live_thread = threading.Thread(target=self.live)
+        self.live_thread.start()
+        return
     def terminate(self):
         """
         End the Manas
@@ -163,7 +192,10 @@ class Manas:
         self.ears.terminate()
         self.eyes.terminate()
         self.speak.terminate()
-        self.alive = False
+        if self.live_thread is not None:
+            self.alive = False
+            self.live_thread.join()  # Wait for the live thread to finish
+            self.live_thread = None
         return
 
     def analyze(self, data,previous_repsonse):
