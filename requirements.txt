@@ -1,7 +1,7 @@
 albumentations==1.4.6
 comet_ml==3.41.0
 coremltools==7.2
-crewai==0.28.8
+crewai
 common
 easyocr==1.7.1
 langchain_core==0.1.50

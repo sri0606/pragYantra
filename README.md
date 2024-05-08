@@ -40,6 +40,14 @@ To set up the project, follow these steps:
    ```
 
 3. Run the setup script:
+
+   - Run the python setup script:
+     ```
+     python setup.py
+     ```
+
+   OR
+
    - On Unix-like systems (like Linux or macOS):
      ```
      chmod +x setup.sh
