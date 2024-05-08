@@ -23,19 +23,31 @@ The backbone of PragYantra consists of various open-source models for tasks such
 
 PragYantra, derived from Sanskrit, is a fusion of two words: "Prag" meaning intelligent or wise, and "Yantra" referring to machine or robot. So, put together, PragYantra embodies the concept of an intelligent machine, reflecting the project's goal of creating a flexible platform for experimenting with AI and human-machine interaction.
 
-## Installation
+## Setup and Installation
 
-To install and run PragYantra on your device, follow these steps:
+To set up the project, follow these steps:
 
-Clone the repository:
+1. Clone the repository:
 
-```bash
-git clone https://github.com/sri0606/pragYantra.git
-```
+   ```
+   git clone https://github.com/sri0606/pragyantra.git
+   ```
 
-Navigate to the project directory and Install dependencies:
+2. Navigate to the project directory:
 
-```
-cd src
-pip install -r requirements.txt
-```
+   ```
+   cd pragyantra
+   ```
+
+3. Run the setup script:
+   - On Unix-like systems (like Linux or macOS):
+     ```
+     chmod +x setup.sh
+     ./setup.sh
+     ```
+   - On Windows, using Git Bash:
+     ```
+     bash setup.sh
+     ```
+
+The setup script will install the necessary dependencies, download the required models, and create the necessary directories.
