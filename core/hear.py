@@ -1,5 +1,5 @@
 import threading
-from utils.aid_hear import live_transcribe, TalkingState
+from .utils.aid_hear import live_transcribe, TalkingState
 
 class LiveTranscriber:
     """

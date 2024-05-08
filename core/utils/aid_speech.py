@@ -1,5 +1,6 @@
 import pyttsx3
 import os
+from .. import MODELS_DIR
 
 class Speech:
     """
@@ -192,7 +193,7 @@ class FacebookMMS(Speech):
             language (str): The language to use for the model. Default is "en".
         """
         super().__init__()
-        model_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models/facebook_mms_tts_eng")
+        model_dir = os.path.join(MODELS_DIR,"facebook_mms_tts_eng")
         try:
             #try loading the model from the projects local src/models directory
             self.model = VitsModel.from_pretrained(model_dir)

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import numpy as np
+from .. import MODELS_DIR, MEMORY_STREAM_DIR
 # def get_classifier_labels():
 #     """
 #     Get the classifier labels
@@ -23,10 +24,11 @@ class ImageProcessor:
     Image helper class for VisionAid and Vision classes
     """
     try:
+        model_dir = os.path.join(MODELS_DIR,"gpt2-image-captioning")
         #try loading from projects local models dir
-        model = VisionEncoderDecoderModel.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
-        feature_extractor = ViTImageProcessor.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
-        tokenizer = AutoTokenizer.from_pretrained(os.path.abspath("models/gpt2-image-captioning"))
+        model = VisionEncoderDecoderModel.from_pretrained(model_dir)
+        feature_extractor = ViTImageProcessor.from_pretrained(model_dir)
+        tokenizer = AutoTokenizer.from_pretrained(model_dir)
     except:
         #load from huggingface
         model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
@@ -182,7 +184,7 @@ class VisionAid:
         """
         self.stop_event_wait_time = stop_event_wait_time
         self.save_to_json_interval = save_to_json_interval
-        self._camera = cv2.VideoCapture(0) # Initialize the camera
+        self._camera = None
         self.image_processor = ImageProcessor()
 
     def __capture_image(self):
@@ -194,6 +196,18 @@ class VisionAid:
         if not ret:
             raise IOError("Cannot read frame from camera")
         return frame
+
+    def set_blind(self,blind):
+        """
+        Set the camera if not "blind", else release it
+
+        Args:
+            blind (bool): A boolean value to set the camera on or off.
+        """
+        if not blind:
+            self._camera = cv2.VideoCapture(0) # Initialize the camera
+        else:
+            self._camera.release()
 
     def __preprocess_image(self):
         """
@@ -226,7 +240,7 @@ class VisionAid:
         Returns:
             None
         """
-        vision_log_dir_path = "memory_stream/vision_logs/"
+        vision_log_dir_path = os.path.join(MEMORY_STREAM_DIR,"vision_logs/")
 
         # Initialize a timer
         next_save_time = datetime.now() + timedelta(seconds=self.save_to_json_interval)

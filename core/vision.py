@@ -1,5 +1,5 @@
 import threading
-from utils.aid_vision import VisionAid
+from .utils.aid_vision import VisionAid
 
 class LiveVision:
     """
@@ -20,7 +20,7 @@ class LiveVision:
         if self._thread is not None and self._thread.is_alive():
           print("Vision is already running")
           return
-
+        self._eyes.set_blind(False)
         self._thread = threading.Thread(target=self._eyes.get_visual_context, args=(self._stop_event,))
         self._thread.start()
 
@@ -33,7 +33,7 @@ class LiveVision:
         """
         if self._thread is None or not self._thread.is_alive():
             return
-
+        self._eyes.set_blind(True)
         # Signal the Vision thread to stop
         self._stop_event.set()
 

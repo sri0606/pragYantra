@@ -10,6 +10,7 @@ from queue import Queue
 from time import sleep
 from sys import platform
 import json
+from .. import MODELS_DIR, MEMORY_STREAM_DIR
 
 class TalkingState:
     """
@@ -68,7 +69,6 @@ def live_transcribe(talking_state: TalkingState,model="medium", non_english=Fals
     # Definitely do this, dynamic energy compensation lowers the energy threshold dramatically to a point where the SpeechRecognizer never stops recording.
     recorder.dynamic_energy_threshold = False
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
     # Important for linux users.
     # Prevents permanent application hang and crash by using the wrong Microphone
     if 'linux' in platform:
@@ -91,7 +91,7 @@ def live_transcribe(talking_state: TalkingState,model="medium", non_english=Fals
             model = model + ".en"
     try:
         #try loading from project's local models dir
-        audio_model = whisper.load_model(os.path.join(script_dir,"..", "models", f"{model}.pt"))
+        audio_model = whisper.load_model(os.path.join(MODELS_DIR, f"{model}.pt"))
     except FileNotFoundError:
         audio_model = whisper.load_model(model)
 
@@ -127,7 +127,7 @@ def live_transcribe(talking_state: TalkingState,model="medium", non_english=Fals
     # Cue the user that we're ready to go.
     print("Whisper Model loaded.\n")
 
-    transcript_dir_path = os.path.join(script_dir,"..", "memory_stream", "hearing_logs")
+    transcript_dir_path = os.path.join(MEMORY_STREAM_DIR, "hearing_logs")
 
     # Initialize a timer
     next_save_time = datetime.now() + timedelta(seconds=3)
@@ -199,5 +199,6 @@ def live_transcribe(talking_state: TalkingState,model="medium", non_english=Fals
             break
 
 if __name__ == '__main__':
-    talking_state = TalkingState()
-    live_transcribe(talking_state, model='base',non_english=False)
+    # talking_state = TalkingState()
+    # live_transcribe(talking_state, model='base',non_english=False)
+    print(MODELS_DIR)

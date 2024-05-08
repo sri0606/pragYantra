@@ -1,10 +1,11 @@
 import threading
-from utils.aid_speech import Pyttsx3Speech,ElevenLabsSpeech, FacebookMMS
+from .utils.aid_speech import Pyttsx3Speech,ElevenLabsSpeech, FacebookMMS
 import queue
 import os
 import pygame
 import time
 from datetime import datetime
+from . import MEMORY_STREAM_DIR
 
 class LiveSpeech:
     """
@@ -45,6 +46,7 @@ class LiveSpeech:
         self._queue = queue.Queue()
         self._stop_event = threading.Event()
         self.ears_pause_event = None
+        self._cleanup_thread = threading.Thread(target=self.cleanup)
 
     def set_ears_pause_event(self, event: threading.Event):
         """
@@ -74,7 +76,7 @@ class LiveSpeech:
             except queue.Empty:
                 continue
 
-            save_dir = os.path.join(os.getcwd(), "memory_stream/audio_logs/")
+            save_dir = os.path.join(MEMORY_STREAM_DIR,'audio_logs/')
             filename = save_dir + datetime.now().strftime("%Y%m%d%H%M%S") + ".wav"
 
             # Save the speech to an audio file in a separate thread
@@ -125,6 +127,7 @@ class LiveSpeech:
 
         self._thread = threading.Thread(target=self._process_speech)
         self._thread.start()
+        self._cleanup_thread.start()   
 
         print("Speech thread started")
 
@@ -177,6 +180,25 @@ class LiveSpeech:
         """
         pygame.mixer.music.unpause()
 
+    def cleanup(self,sleep_time=20):
+        """
+        Regularly cleans up the audio logs directory.
+        """
+        while not self._stop_event.is_set():
+            time.sleep(sleep_time)  # Sleep for 20 seconds
+
+            # Delete all files in the directory
+            save_dir = os.path.join(MEMORY_STREAM_DIR,'audio_logs/')
+            for filename in os.listdir(save_dir):
+                file_path = os.path.join(save_dir, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    #if error occured, it most probably means that the file is still being used by speech thread
+                    continue
+                    # print(f'Failed to delete {file_path}. Reason: {e}')
+
     def terminate(self):
         """
         Terminates the speech processing thread.
@@ -197,6 +219,9 @@ class LiveSpeech:
 
         # Wait for the Speech thread to finish
         self._thread.join(timeout=1.0)
+
+        # Wait for the cleanup thread to finish
+        self._cleanup_thread.join(timeout=5.0)  
 
         # Reset the stop event so we can start the Speech again
         self._stop_event.clear()

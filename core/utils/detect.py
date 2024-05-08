@@ -3,6 +3,7 @@ import tensorflow as tf
 # from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 from PIL import Image
 import easyocr
+from .. import MODELS_DIR
 
 def detect_faces(image_path):
     # Load the pre-trained face detection model from OpenCV
@@ -59,8 +60,8 @@ def extract_text(image_path):
 # def extract_text_handwritten(image_path):
     
 #     # Load the processor and model from a specific folder
-#     processor = TrOCRProcessor.from_pretrained('../models/trOCR')
-#     model = VisionEncoderDecoderModel.from_pretrained('../models/trOCR')
+#     processor = TrOCRProcessor.from_pretrained(os.path.join(MODELS_DIR,'trOCR')
+#     model = VisionEncoderDecoderModel.from_pretrained(os.path.join(MODELS_DIR,'trOCR')
 
 #     image = Image.open(image_path).convert("RGB")
 
