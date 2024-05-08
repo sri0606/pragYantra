@@ -1,24 +1,23 @@
 from datetime import datetime, timedelta
 import os
 import json
+from . import MEMORY_STREAM_DIR
 
 class LiveMemory:
     """
     LiveMemory class retrieve data from memory logs.
 
     """
-    def __init__(self, max_size=-1, data_dir=os.path.abspath("memory_stream/"), latest_time_threshold=5):
+    def __init__(self, max_size=-1,  latest_time_threshold=5):
         """
         Initializes a Memory object.
 
         Args:
             max_size (int, optional): The maximum size of the memory. Defaults to -1, indicating no size limit.
-            data_dir (str, optional): The directory path where memory data will be stored. Defaults to "memory_stream/" in the current working directory.
             latest_time_threshold (int, optional): The time threshold (in seconds) for considering a memory entry as the latest. Defaults to 5 seconds.
         """
         self.max_size = max_size
         self.memory = []
-        self.data_dir = data_dir
         self.latest_time_threshold = latest_time_threshold
 
     def get_latest_memory(self):
@@ -33,8 +32,8 @@ class LiveMemory:
         current_date, current_hour = now.strftime("%Y%m%d %H").split()
 
         # Construct the file path
-        hearing_log_path = os.path.join(self.data_dir+"/hearing_logs", f"{current_date}_transcript.json")
-        vision_log_path = os.path.join(self.data_dir+"/vision_logs", f"{current_date}_vision.json")
+        hearing_log_path = os.path.join(MEMORY_STREAM_DIR,"hearing_logs", f"{current_date}_transcript.json")
+        vision_log_path = os.path.join(MEMORY_STREAM_DIR,"vision_logs", f"{current_date}_vision.json")
 
         # Load the data from the file
         try:

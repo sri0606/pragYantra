@@ -2,6 +2,8 @@ from transformers import BertTokenizer, BertModel
 import torch
 import pickle
 import string
+import os
+from . import MODELS_DIR
 
 class VectorDatabase:
     """
@@ -31,8 +33,13 @@ class VectorDatabase:
         Args:
             model_name (str, optional): The name of the BERT model to use for vectorization.
         """
-        self.model = BertModel.from_pretrained('bert-base-uncased').eval()
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        try:
+            bert_path = os.path.join(MODELS_DIR,"bert-base-uncased")
+            self.model = BertModel.from_pretrained(bert_path).eval()
+            self.tokenizer = BertTokenizer.from_pretrained(bert_path)
+        except:
+            self.model = BertModel.from_pretrained('bert-base-uncased').eval()
+            self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.vectors = {}
 
     def preprocess_text(self, text):
