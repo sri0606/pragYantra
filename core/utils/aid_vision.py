@@ -23,36 +23,26 @@ class ImageProcessor:
     """
     Image helper class for VisionAid and Vision classes
     """
-    try:
-        model_dir = os.path.join(MODELS_DIR,"gpt2-image-captioning")
-        #try loading from projects local models dir
-        model = VisionEncoderDecoderModel.from_pretrained(model_dir)
-        feature_extractor = ViTImageProcessor.from_pretrained(model_dir)
-        tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    except:
-        #load from huggingface
-        model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-        feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-        tokenizer = AutoTokenizer.from_pretrained("nlp-connect/vit-gpt2-image-captioning")
-        
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    
+    # Set the logging level to 'ERROR' to suppress informational messages
+
     def __init__(self):
         """
-        Constructor
+        Constructor. Initializes the model and tokenizer.
         """
-        # self._path = None
-        # # Load the model weights
-        # state_dict = torch.load('./models/vision_resnet18.pth')
-
-        # # Load the model architecture, using ResNet18 as an example
-        # self.classifiers = models.resnet18()
-        # # Apply the weights to the model
-        # self.classifiers.load_state_dict(state_dict)
-        # # Ensure the model is in evaluation mode
-        # self.classifiers.eval()
-        pass
+        try:
+            model_dir = os.path.join(MODELS_DIR,"gpt2-image-captioning")
+            #try loading from projects local models dir
+            self.model = VisionEncoderDecoderModel.from_pretrained(model_dir)
+            self.feature_extractor = ViTImageProcessor.from_pretrained(model_dir)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        except:
+            #load from huggingface
+            self.model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+            self.feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+            self.tokenizer = AutoTokenizer.from_pretrained("nlp-connect/vit-gpt2-image-captioning")
+            
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
 
     def load_image(self, image_data):
         """
@@ -243,7 +233,7 @@ class VisionAid:
         vision_log_dir_path = os.path.join(MEMORY_STREAM_DIR,"vision_logs/")
 
         # Initialize a timer
-        next_save_time = datetime.now() + timedelta(seconds=self.save_to_json_interval)
+        next_save_time = datetime.now() + timedelta(seconds=0)
         vision_log = {}
 
         while not stop_event.is_set():

@@ -6,16 +6,14 @@ PragYantra is a versatile software project that aims to simulate a humanoid robo
 
 ## Features
 
-- **Vision**: PragYantra simulates vision capabilities, allowing it to process visual data and make decisions based on it.
-- **Hearing**: With simulated auditory sensors, PragYantra can perceive sounds and respond accordingly.
-- **Speech**: PragYantra is capable of generating simulated speech output, enabling it to communicate with users in natural language.
-- **Memory**: The software includes memory capabilities, enabling PragYantra to store and recall information from previous interactions.
+- **Vision**: PragYantra simulates vision capabilities, allowing it to process visual data and make decisions based on it. As of now, it just uses live image captions.
+- **Hearing**: PragYantra can perceive sounds and respond in realtime accordingly.
+- **Speech**: Capable of generating simulated speech output and communicate with users in natural language.
+- **Memory**: Includes memory capabilities (very limited for now), enabling PragYantra to store and recall information from previous interactions. Currently, it only "memorizes" recent interactions.
 
 ## Technical details
 
-One of the key design principles behind PragYantra was prioritizing offline capabilities while also integrating online functionalities. This decision was made to ensure privacy and accessibility without compromising on performance.
-
-To achieve this, all components of the project were designed to have offline capabilities, with online functionalities available as optional features. While using offline mode may require a stronger device for faster inference, the project is fully functional and performs admirably under these conditions.
+I prioritized PragYantra to have offline capabilities while also integrating online functionalities. To achieve this, all components of the project were designed to have offline capabilities, with online functionalities available as optional features. While using offline mode may require a stronger device for faster inference, the project is fully functional and performs admirably under these conditions.
 
 The backbone of PragYantra consists of various open-source models for tasks such as text-to-speech, speech-to-text, text-to-text, and image-to-text conversion. These models serve as the building blocks upon which PragYantra's architecture is built, with additional capabilities and concurrency seamlessly integrated to enhance overall performance and user experience.
 
@@ -59,6 +57,32 @@ To set up the project, follow these steps:
      ```
 
 The setup script will install the dependencies, download the required models, and create the necessary directories.
+
+## Run the program and interact
+
+For help, run the following command:
+
+```
+python main.py --help
+```
+
+Example commands:
+
+- Offline mode
+
+  ```bash
+  python main.py --interpreter_model llama3_8B --offline_mode --speaker_model pyttsx3
+  ```
+
+- Online mode
+
+  ```bash
+  python main.py --interpreter_model llama3-70B-8192 --speaker_model pyttsx3
+
+  or
+
+  python main.py --interpreter_model mixtral-8x7b-32768 --speaker_model 11labs
+  ```
 
 ## Citations and Acknowledgements
 

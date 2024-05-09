@@ -5,3 +5,5 @@ MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
 
 #path to your memory stream directory, where all logs are saved
 MEMORY_STREAM_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "memory_stream")
+
+ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
