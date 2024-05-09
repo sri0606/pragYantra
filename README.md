@@ -58,4 +58,33 @@ To set up the project, follow these steps:
      bash setup.sh
      ```
 
-The setup script will install the necessary dependencies, download the required models, and create the necessary directories.
+The setup script will install the dependencies, download the required models, and create the necessary directories.
+
+## Citations and Acknowledgements
+
+```bitbtex
+@misc {nlp_connect_2022,
+   author = { {NLP Connect} },
+   title = { vit-gpt2-image-captioning (Revision 0e334c7) },
+   year = 2022,
+   url = { https://huggingface.co/nlpconnect/vit-gpt2-image-captioning },
+   doi = { 10.57967/hf/0222 },
+   publisher = { Hugging Face }
+   }
+
+@article{pratap2023mms,
+   title={Scaling Speech Technology to 1,000+ Languages},
+   author={Vineel Pratap and Andros Tjandra and Bowen Shi and Paden Tomasello and Arun Babu and Sayani Kundu and Ali Elkahky and Zhaoheng Ni and Apoorv Vyas and Maryam Fazel-Zarandi and Alexei Baevski and Yossi Adi and Xiaohui Zhang and Wei-Ning Hsu and Alexis Conneau and Michael Auli},
+   journal={arXiv},
+   year={2023}
+   }
+
+@misc{li2021trocr,
+   title={TrOCR: Transformer-based Optical Character Recognition with Pre-trained Models},
+   author={Minghao Li and Tengchao Lv and Lei Cui and Yijuan Lu and Dinei Florencio and Cha Zhang and Zhoujun Li and Furu Wei},
+   year={2021},
+   eprint={2109.10282},
+   archivePrefix={arXiv},
+   primaryClass={cs.CL}
+   }
+```
