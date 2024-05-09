@@ -81,7 +81,7 @@ class LiveTranscriber:
       self._stop_event.set()
 
       # Wait for the transcription thread to finish
-      self._thread.join()
+      self._thread.join(timeout=1.0)
 
       # Reset the stop event so we can start the transcription again
       self._stop_event.clear()

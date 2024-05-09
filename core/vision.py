@@ -38,7 +38,7 @@ class LiveVision:
         self._stop_event.set()
 
         # Wait for the Vision thread to finish
-        self._thread.join()
+        self._thread.join(timeout=3.0)
 
         # Reset the stop event so we can start the Vision again
         self._stop_event.clear()

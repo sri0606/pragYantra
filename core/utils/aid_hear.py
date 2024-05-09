@@ -125,12 +125,12 @@ def live_transcribe(talking_state: TalkingState,model="medium", non_english=Fals
     recorder.listen_in_background(source, record_callback, phrase_time_limit=record_timeout)
 
     # Cue the user that we're ready to go.
-    print("Whisper Model loaded.\n")
+    print("Whisper Model loaded.")
 
     transcript_dir_path = os.path.join(MEMORY_STREAM_DIR, "hearing_logs")
 
     # Initialize a timer
-    next_save_time = datetime.now() + timedelta(seconds=3)
+    next_save_time = datetime.now() + timedelta(seconds=0)
     text = ''
     
     transcriptions = {}

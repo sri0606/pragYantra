@@ -51,7 +51,7 @@ class LiveMemory:
                     latest_heard_data = heard_data[current_hour][-1][1]
                     recent_heard_data = heard_data[current_hour][-2][1] if len(heard_data[current_hour]) > 1 else ""
         except Exception as e:
-            print(e)
+            # print(e)
             latest_heard_data = ""
             recent_heard_data = ""
 
@@ -70,7 +70,7 @@ class LiveMemory:
                     latest_seen_data = str(seen_data[current_hour][-1][1])
                     recent_seen_data = str(seen_data[current_hour][-2][1]) if len(seen_data[current_hour]) > 1 else ""
         except Exception as e:
-            print(e)
+            # print(e)
             latest_seen_data = ""
             recent_seen_data = ""
             

@@ -9,10 +9,10 @@ from memory.memory import LiveMemory
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
-from . import MODELS_DIR
+from . import MODELS_DIR, ENV_PATH
 
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv(ENV_PATH)
 
 class Interpreter:
     """
@@ -49,7 +49,10 @@ class Llama(Interpreter):
             model_name (str): Model filename. Defaults to "llama3_8B".
         """
         model_path=os.path.join(MODELS_DIR,model_name+".gguf")
-        self._llama = LlamaCPP(model_path=model_path)
+        if os.path.exists(model_path):
+            self._llama = LlamaCPP(model_path=model_path)
+        else:
+            raise FileNotFoundError(f"Model file {model_path} not found.")
     
     def get_response(self, prompt):
         """
@@ -142,7 +145,7 @@ class Manas:
     It can see, hear, speak, and understand the world around it.
     """
 
-    def __init__(self,interpreter_model,offline_mode=False,groq_api_key=None,speaker_model="pyttsx3"):
+    def __init__(self,interpreter_model,offline_mode=True,groq_api_key=None,speaker_model="pyttsx3"):
         """
         Constructor
 
@@ -154,10 +157,10 @@ class Manas:
         Make sure you have the model file in the models directory.
         """
         if not offline_mode:
-            print("Running in online mode. Make sure the model name is correct and you have the Groq API key.")
+            # Running in online mode. Make sure the model name is correct and you have the Groq API key.
             self.interpreter = Groq(model_name=interpreter_model, groq_api_key=groq_api_key)
         else:
-            print("Running in offline mode.\nMake sure you have the quantized GGUF model file in the models directory")
+            #Running in offline mode.\nMake sure you have the quantized GGUF model file in the models directory
             self.interpreter = Llama(model_name=interpreter_model)
         
         self.ears = LiveTranscriber()
@@ -194,7 +197,7 @@ class Manas:
         self.speak.terminate()
         if self.live_thread is not None:
             self.alive = False
-            self.live_thread.join()  # Wait for the live thread to finish
+            self.live_thread.join(timeout=3.0)  # Wait for the live thread to finish
             self.live_thread = None
         return
 

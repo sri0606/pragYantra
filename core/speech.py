@@ -2,6 +2,7 @@ import threading
 from .utils.aid_speech import Pyttsx3Speech,ElevenLabsSpeech, FacebookMMS
 import queue
 import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 import time
 from datetime import datetime

@@ -1,6 +1,6 @@
 import pyttsx3
 import os
-from .. import MODELS_DIR
+from .. import MODELS_DIR, ENV_PATH
 
 class Speech:
     """
@@ -112,13 +112,18 @@ from pydub.playback import play
 import io
 import time
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(ENV_PATH)
 
 class ElevenLabsSpeech(Speech):
     """
     A class that provides text-to-speech functionality using the Eleven Labs API.
     """
-
+    def __init__(self):
+        """
+        
+        """
+        super().__init__()
+        print("Add a speech key to the env file in root directory")
     def __get_response(self, text):
         """
         This method converts text to audio using Eleven Labs API.
