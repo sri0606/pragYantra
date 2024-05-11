@@ -267,8 +267,8 @@ if __name__ == '__main__':
     manas = Manas()
     # manas.start()
 
-    data = {"vision":"A man laying on a bed with his pillow",
-            "audio" :"Do you know that I bought this pillow for $5! Haha!"}
+    data = {"vision":"A man working looking at his phone",
+            "audio" :"It is a beautiful day outside today."}
     response = manas.analyze(data)
 
     print(response)

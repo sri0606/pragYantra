@@ -8,16 +8,13 @@ class LiveMemory:
     LiveMemory class retrieve data from memory logs.
 
     """
-    def __init__(self, max_size=-1,  latest_time_threshold=5):
+    def __init__(self, latest_time_threshold=5):
         """
         Initializes a Memory object.
 
         Args:
-            max_size (int, optional): The maximum size of the memory. Defaults to -1, indicating no size limit.
             latest_time_threshold (int, optional): The time threshold (in seconds) for considering a memory entry as the latest. Defaults to 5 seconds.
         """
-        self.max_size = max_size
-        self.memory = []
         self.latest_time_threshold = latest_time_threshold
 
     def get_latest_memory(self):
@@ -77,27 +74,7 @@ class LiveMemory:
         return {"latest":{"vision":latest_seen_data, "audio":latest_heard_data},
                 "recent":{"vision":recent_seen_data, "audio":recent_heard_data}}
 
-    def process(self, transition):
-        # This method should be overridden by subclasses to provide specific processing
-        raise NotImplementedError
 
-# class ShortTermMemory(LiveMemory):
-#     def __init__(self, max_size):
-#         super(ShortTermMemory, self).__init__(max_size)
-#         self.memory = deque(maxlen=max_size)
-
-#     def process(self, transition):
-#         # Here you could add code to process the transition in a way that's specific to short-term memory
-#         pass
-
-# class LongTermMemory(LiveMemory):
-#     def __init__(self, max_size):
-#         super(LongTermMemory, self).__init__(max_size)
-#         self.memory = deque(maxlen=max_size)
-
-#     def process(self, transition):
-#         # Here you could add code to process the transition in a way that's specific to long-term memory
-#         pass
 
 
 if __name__ == "__main__":
