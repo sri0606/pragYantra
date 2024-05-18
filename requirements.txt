@@ -28,4 +28,5 @@ torch
 torchvision
 transformers
 ultralytics==8.2.4
-# ~pencv_python==4.9.0.80
+h5py
+sentence-transformers
