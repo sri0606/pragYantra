@@ -1,6 +1,6 @@
 # PragYantra
 
-PragYantra is a simple software project that aims to simulate a humanoid robot with vision, hearing, speech, and memory functionalities. This project aims to create a flexible platform for experimenting with artificial intelligence and human-machine interaction. As of now, it is more like an LLM, but with extended capabilities, enabling it to see, hear and engage in verbal communication.
+PragYantra is a simple software project designed to simulate a humanoid robot with vision, hearing, speech, and memory functionalities. This project aims to create a flexible platform for experimenting with artificial intelligence and human-machine interaction. As of now, it is more like an LLM, but with extended capabilities, enabling it to see, hear and engage in verbal communication.
 
 ![PragYantra's Architecture](arch.jpg)
 
