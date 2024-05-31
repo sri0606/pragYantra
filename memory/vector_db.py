@@ -1,10 +1,12 @@
 import os
 import torch
 import h5py
-import numpy as np
+from datetime import datetime
+import base64
+import pickle
 from sentence_transformers import SentenceTransformer, util
 from transformers import BertTokenizer, BertModel
-from utils.summarize import Summarizer
+from .utils.summarize import Summarizer
 from . import MODELS_DIR, MEMORY_STREAM_DIR
 
 class VectorDatabase:
@@ -28,7 +30,33 @@ class VectorDatabase:
         self.vectors = {}
         self.summarizer = Summarizer()
 
-    def preprocess_text(self, text, threshold_length=100):
+    def __str__(self):
+        return f"VectorDatabase with {len(self.vectors)} vectors"
+
+    def __add__(self, other):
+        self.integrate_databases(other)
+        return self
+    
+    def __len__(self):
+        return len(self.vectors)
+    
+
+    def __getitem__(self, key):
+        if isinstance(key, datetime):
+            key = key.strftime("%Y%m%d%H%M")
+        elif isinstance(key, int):
+            key = str(key)
+
+        if len(key) == 12:  # Full format
+            return self.vectors[key]["summary"]
+        else:
+            summaries = []
+            for timestamp_key, value in self.vectors.items():
+                if timestamp_key.startswith(key):
+                    summaries.append((timestamp_key,value["summary"]))
+            return summaries
+
+    def preprocess_text(self, text, threshold_length=200):
         """
         Preprocesses the input text if its too long by summarizing it.
 
@@ -42,22 +70,39 @@ class VectorDatabase:
             text = self.summarizer.summarize(text)
         return text
     
-    def add_vector(self,key,text):
+    def pre_seed_memory(self, data: dict, save_path=None):
+        """
+        Pre-seed the memory with given data kind of like initial memory configuration. 
+
+        Args:
+            data (dict): A dictionary of key-value pairs to seed the memory with. The key is the timestamp in the format YYMMDDHHMM (with minutes set to either 00 or 30) and the value is a tuple of the summary and text.
+            save_path (str, optional): The path to save the memory to. Defaults to None.
+        """
+        if not data or not isinstance(data, dict):
+            raise ValueError("Data must be a non-empty dictionary.")
+
+        for timestamp,(summary,text)  in data.items():
+            self.add_vector(timestamp_key=timestamp, text=text,summary=summary )
+        if save_path:
+            self.save(save_path)
+
+    def add_vector(self, timestamp_key, text, summary=None):
         """
         Adds a vector to the database.
 
         Args:
-            key (str): The key to associate with the vector.
+            timestamp_key (str): The timestamp key to associate with the vector. (timestamp YYMMDDHHMM (minutes can either be 00 or 30 as memory is added every 30mins))
             text (str): The text to vectorize and add to the database.
+            summary (list, optional): The summary associated with the vector. Defaults to None.
         """
-        preprocess_text = self.preprocess_text(text,threshold_length=100)
+        preprocess_text = self.preprocess_text(text, threshold_length=100)
         vector_emb = self.vectorize_text(preprocess_text)
-        self.vectors[key] = vector_emb
+        self.vectors[timestamp_key] = {'vector': vector_emb, 'summary': str(summary)}
 
     def vectorize_text(self,text):
         raise NotImplementedError("VectorDatabase.vectorize_text method is not implemented")
     
-    def query(self,text,k=10):
+    def query(self, text, date=None, date_type='day', k=5, days_threshold=2):
         raise NotImplementedError("VectorDatabase.query method is not implemented")
     
     def save(self, filename):
@@ -69,7 +114,9 @@ class VectorDatabase:
         """
         with h5py.File(os.path.join(MEMORY_STREAM_DIR,filename), 'w') as f:
             for key, value in self.vectors.items():
-                f.create_dataset(key, data=value)
+                # Serialize the value to a byte string and encode it to base64 (to avoid NULL errors) )
+                serialized_value = base64.b64encode(pickle.dumps(value))
+                f.create_dataset(key, data=serialized_value)
 
     def load(self, filename):
         """
@@ -79,8 +126,25 @@ class VectorDatabase:
             filename (str): The name of the file to load the vectors from.
         """
         with h5py.File(os.path.join(MEMORY_STREAM_DIR,filename), 'r') as f:
-            self.vectors = {key: np.array(value) for key, value in f.items()}
+            for key in f.keys():
+                # Decode the value from base64 and deserialize it from a byte string
+                self.vectors[key] = pickle.loads(base64.b64decode(f[key][()]))
 
+    def integrate_databases(self, source_db):
+        """
+        Integrates the data from the source database into the target database.
+
+        Args:
+            source_db (VectorDatabase): The source database.
+        """
+        if not isinstance(source_db, type(self)):
+            raise TypeError("Source database must be of the same type as the target database")
+
+        if self is source_db:
+            raise ValueError("Cannot integrate a database with itself")
+
+        for key, vector in source_db.vectors.items():
+            self.vectors[key] = vector
 
 class VectorDatabaseSB(VectorDatabase):
     """
@@ -100,15 +164,38 @@ class VectorDatabaseSB(VectorDatabase):
         embedding = self.model.encode(text, convert_to_tensor=True)
         return embedding.numpy()
 
-    def query(self, text, k=5):
-        query_embedding = self.model.encode(text, convert_to_tensor=True)
-        vectors = torch.stack([torch.from_numpy(v) for v in self.vectors.values()])
-        hits = util.semantic_search(query_embedding, vectors, top_k=k)  # Unsqueeze the query_embedding to match the dimensions
-        return [(list(self.vectors.keys())[hit['corpus_id']], hit['score']) for hit in hits[0]]
 
+
+    def query(self, text, date=None, date_type='day', k=5, days_threshold=2):
+        """
+        Query embeddings for similar vectors. 
+        You can query a text with specific day, month or year. The 'date' parameter should be in the format 'YYYYMMDD' for day, 'YYYYMM' for month, and 'YYYY' for year.
+
+        Args:
+            text (str): The query text.
+            date (str, optional): Specific date to query for. Defaults to None.
+            date_type (str, optional): The type of date query ('day', 'month', or 'year'). Defaults to 'day'.
+            k (int, optional): The number of most similar vectors to return. Defaults to 5.
+            days_threshold (int, optional): The threshold for the date. Defaults to 2.
+        """
+        filtered_vectors = {timestamp_key: value for timestamp_key, value in self.vectors.items() 
+                            if date is None or 
+                            (date_type == 'day' and abs((datetime.strptime(timestamp_key, "%Y%m%d%H%M") - datetime.strptime(date, "%Y%m%d")).days) <= days_threshold) or 
+                            (date_type == 'month' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").month == datetime.strptime(date, "%Y%m").month) or 
+                            (date_type == 'year' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").year == int(date))}
+        
+        if len(filtered_vectors)==0:
+            print("No vectors found for the given date.\n Searching entire database....")
+            filtered_vectors = self.vectors
+
+        query_embedding = self.model.encode(text, convert_to_tensor=True)
+        vectors = torch.stack([torch.from_numpy(v['vector']) for v in filtered_vectors.values()])
+        hits = util.semantic_search(query_embedding, vectors, top_k=k)
+        return [(key, hit['score'], filtered_vectors[key]['summary']) for hit in hits[0] for key in [list(filtered_vectors.keys())[hit['corpus_id']]]]
+    
 class VectorDatabaseBert(VectorDatabase):
     """
-    A class representing a vector database using BERT model.
+    DEPRECATED: A class representing a vector database using BERT model.
 
     Attributes:
         model (BertModel): The BERT model used for vectorization.
@@ -185,37 +272,65 @@ class VectorDatabaseBert(VectorDatabase):
         norm2 = torch.norm(torch.tensor(vector2))
         return dot_product / (norm1 * norm2)
     
-
-
 import time
+
 if __name__ == '__main__':
-    db = VectorDatabaseBert()
     db1 = VectorDatabaseSB()
-    start_time=time.time()
-    db.add_vector('hello', 'Hello, world!')
-    db.add_vector('goodbye', 'Goodbye, world!')
-    print('Adding time b:',time.time()-start_time)
     
-    start_time=time.time()  
-    db1.add_vector('hello', 'Hello, world!')
-    db1.add_vector('goodbye', 'Goodbye, world!')
-    print('Adding time sb:',time.time()-start_time)
-    db.save('vectors.h5')
-    db1.save('vectorssb.h5')
+    #genereated with chatgpt
+    random_initial_memory = {
+        '202303261530': ('Family Vacation to Italy',
+        'Exploring ancient ruins and indulging in delicious Italian cuisine, soaking in the rich history and vibrant culture of Italy.'),
+        '202210252200': ('Hiking Mount Kilimanjaro',
+        'Reaching the summit of Mount Kilimanjaro after days of challenging trekking, feeling a sense of accomplishment and awe at the breathtaking views.'),
+        '202009210500': ('First Day of College',
+        'Navigating the bustling campus with a mix of excitement and nervousness, eager to embark on this new academic journey.'),
+        '202107141830': ('Volunteering at a Homeless Shelter',
+        'Spending a day serving meals and interacting with residents at a homeless shelter, feeling humbled and grateful for the opportunity to make a difference.'),
+        '192109081830': ('Road Trip Across America',
+        'Embarking on a cross-country road trip with friends, discovering hidden gems and creating unforgettable memories along the way.'),
+        '192305222200': ('High School Prom',
+        'Dancing the night away with friends, feeling like royalty in my elegant gown and making memories that would last a lifetime.'),
+        '182011261100': ('Attending a Music Festival',
+        'Immersing myself in the electrifying atmosphere of a music festival, dancing to my favorite bands and connecting with fellow music lovers.'),
+        '202209051830': ('Skydiving for the First Time',
+        'Feeling an exhilarating rush of adrenaline as I leaped from the plane and soared through the sky, overcome with a sense of freedom and thrill.'),
+        '202003050730': ('Watching the Northern Lights',
+        'Gazing up at the mesmerizing display of colors dancing across the night sky, feeling humbled by the beauty and wonder of the natural world.'),
+        '192008230430': ('Cooking a Homemade Meal with Family',
+        'Gathering in the kitchen with loved ones, sharing laughter and stories as we prepared a delicious homemade meal together.'),
+        '202002252230': ("Celebrating New Year's Eve in Times Square",
+        'Counting down to midnight amidst the sea of revelers in Times Square, feeling a sense of unity and excitement as we welcomed the new year.'),
+        '202005082200': ("Attending a Friend's Wedding",
+        'Witnessing the love and joy between two dear friends as they exchanged vows, feeling honored to be part of their special day.'),
+        '192101082100': ('Scuba Diving in the Great Barrier Reef',
+        'Exploring the vibrant underwater world of the Great Barrier Reef, swimming alongside colorful fish and majestic coral formations.'),
+        '202206102000': ('Completing a Marathon',
+        'Crossing the finish line of a marathon after months of training and dedication, feeling a surge of pride and accomplishment.'),
+        '202211161630': ('Planting a Garden',
+        'Getting my hands dirty in the soil and watching with joy as my garden bloomed with colorful flowers and delicious fruits and vegetables.')
+    }
 
-    db = VectorDatabaseBert()
-    db1 = VectorDatabaseSB()
-    db.load('vectors.h5')
-    db1.load('vectorssb.h5')
-    db.add_vector("software","I'm working on a software project.")
-    db1.add_vector("software","I'm working on a software project.")
 
-    start_time=time.time()
-    results = db.query('hello world',k=3)
-    print("Similar vectors b:", results)
-    print('Query time b:',time.time()-start_time)
+    print("Initial memory config")
+    start_time = time.time()
+    db1.pre_seed_memory(data = random_initial_memory, save_path='memory.h5')
+    print('Adding time sb:', time.time() - start_time)
 
-    start_time=time.time()
-    results1 = db1.query('hello world',k=3)
-    print("Similar vectors sb:", results1)
-    print('Query time sb:',time.time()-start_time)
+    # Load the vectors from files (if needed)
+    db1.load('memory.h5')
+
+    # Example queries
+    query_texts = [
+        "Recall the experience of hiking Mount Kilimanjaro.",
+        "Retrieve memory of scuba diving in the Great Barrier Reef.",
+        "Music and songs",
+        "Covid 19 pandemic",
+    ]
+    dates = [None,None,1820,2021]
+    for i,query in enumerate(query_texts):
+
+        start_time = time.time()
+        results1 = db1.query(query,date=dates[i],date_type='year', k=3)
+        print("Similar vectors sb:", results1)
+        print('Query time sb:', time.time() - start_time)
