@@ -75,7 +75,7 @@ class Llama(Interpreter):
         #echo: Whether to echo the prompt in the output.
 
         # Define the parameters
-        model_output = self.interpreter(
+        model_output = self._llama(
             prompt,
             max_tokens=200,
             temperature=0.3,
