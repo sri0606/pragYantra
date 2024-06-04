@@ -4,14 +4,61 @@ import h5py
 from datetime import datetime
 import base64
 import pickle
+import numpy as np
+from typing import Dict, List
 from sentence_transformers import SentenceTransformer, util
 from transformers import BertTokenizer, BertModel
 from .utils.summarize import Summarizer
 from . import MODELS_DIR, MEMORY_STREAM_DIR
 
-class VectorDatabase:
+class MemoryNode:
     """
-    Vector database to aid Memory
+    Representation of a memory node.
+    """
+    def __init__(self, timestamp:str | int, text_embedding: np.ndarray, summary:str=None):
+        self.timestamp = timestamp
+        self.summary = summary
+        self.embedding = text_embedding
+    
+    def __str__(self):
+        return f"MemoryNode: {self.format_timestamp(self.timestamp)} - {self.summary}"
+    
+    def __repr__(self):
+        return f"MemoryNode('{self.timestamp}','{self.embedding}', '{self.summary}')"
+    
+    @staticmethod
+    def format_timestamp(timestamp):
+        return f"{timestamp[6:8]}/{timestamp[4:6]}/{timestamp[:4]} {timestamp[8:10]}:{timestamp[10:12]}"
+    
+    def to_dict(self):
+        """
+        Returns a dictionary representation of the MemoryNode object.
+
+        Returns:
+            dict: A dictionary with keys 'timestamp', 'summary', and 'embedding'.
+        """
+        return {
+            'timestamp': self.timestamp,
+            'summary': self.summary,
+            'embedding': self.embedding.tolist()  # Convert numpy array to list
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """
+        Creates a MemoryNode object from a dictionary.
+
+        Args:
+            data (dict): A dictionary with keys 'timestamp', 'summary', and 'embedding'.
+
+        Returns:
+            MemoryNode: A new MemoryNode object.
+        """
+        return cls(data['timestamp'], np.array(data['embedding']), data['summary'])
+    
+class MemoryStoreBase:
+    """
+    Vector database base class to aid Memory
 
     Attributes:
         model: The model used for vectorization.
@@ -26,34 +73,35 @@ class VectorDatabase:
         load(self, filename): Loads the vectors from a file.
     """
 
-    def __init__(self,model=None):
-        self.vectors = {}
+    def __init__(self):
+        # Memory nodes is a dictionary with timestamp as key and MemoryNode as value
+        self.memory_nodes:Dict[str, MemoryNode] = {}
         self.summarizer = Summarizer()
 
     def __str__(self):
-        return f"VectorDatabase with {len(self.vectors)} vectors"
+        return f"Memory with {len(self.memory_nodes)} nodes"
 
     def __add__(self, other):
         self.integrate_databases(other)
         return self
     
     def __len__(self):
-        return len(self.vectors)
+        return len(self.memory_nodes)
     
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> MemoryNode | List[MemoryNode]:
         if isinstance(key, datetime):
             key = key.strftime("%Y%m%d%H%M")
         elif isinstance(key, int):
             key = str(key)
 
         if len(key) == 12:  # Full format
-            return self.vectors[key]["summary"]
+            return self.memory_nodes[key]
         else:
             summaries = []
-            for timestamp_key, value in self.vectors.items():
+            for timestamp_key, memory_node in self.memory_nodes.items():
                 if timestamp_key.startswith(key):
-                    summaries.append((timestamp_key,value["summary"]))
+                    summaries.append((memory_node))
             return summaries
 
     def preprocess_text(self, text, threshold_length=200):
@@ -91,13 +139,13 @@ class VectorDatabase:
         Adds a vector to the database.
 
         Args:
-            timestamp_key (str): The timestamp key to associate with the vector. (timestamp YYMMDDHHMM (minutes can either be 00 or 30 as memory is added every 30mins))
+            timestamp_key (str): The timestamp key to associate with the vector. (timestamp YYmmddHHMM (minutes can either be 00 or 30 as memory is added every 30mins))
             text (str): The text to vectorize and add to the database.
             summary (list, optional): The summary associated with the vector. Defaults to None.
         """
         preprocess_text = self.preprocess_text(text, threshold_length=100)
         vector_emb = self.vectorize_text(preprocess_text)
-        self.vectors[timestamp_key] = {'vector': vector_emb, 'summary': str(summary)}
+        self.memory_nodes[timestamp_key] = MemoryNode(timestamp=timestamp_key, summary=summary, text_embedding=vector_emb)
 
     def vectorize_text(self,text):
         raise NotImplementedError("VectorDatabase.vectorize_text method is not implemented")
@@ -113,9 +161,9 @@ class VectorDatabase:
             filename (str): The name of the file to save the vectors to.
         """
         with h5py.File(os.path.join(MEMORY_STREAM_DIR,filename), 'w') as f:
-            for key, value in self.vectors.items():
+            for key, memory_node in self.memory_nodes.items():
                 # Serialize the value to a byte string and encode it to base64 (to avoid NULL errors) )
-                serialized_value = base64.b64encode(pickle.dumps(value))
+                serialized_value = base64.b64encode(pickle.dumps(memory_node.to_dict()))
                 f.create_dataset(key, data=serialized_value)
 
     def load(self, filename):
@@ -128,7 +176,8 @@ class VectorDatabase:
         with h5py.File(os.path.join(MEMORY_STREAM_DIR,filename), 'r') as f:
             for key in f.keys():
                 # Decode the value from base64 and deserialize it from a byte string
-                self.vectors[key] = pickle.loads(base64.b64decode(f[key][()]))
+                data = pickle.loads(base64.b64decode(f[key][()]))
+                self.memory_nodes[key] = MemoryNode.from_dict(data)
 
     def integrate_databases(self, source_db):
         """
@@ -143,12 +192,12 @@ class VectorDatabase:
         if self is source_db:
             raise ValueError("Cannot integrate a database with itself")
 
-        for key, vector in source_db.vectors.items():
-            self.vectors[key] = vector
+        for key, node in source_db.memory_nodes.items():
+            self.memory_nodes[key] = node
 
-class VectorDatabaseSB(VectorDatabase):
+class MemoryStoreSB(MemoryStoreBase):
     """
-    Vector Database using SenctenceBert models
+    Memory store  using SenctenceBert models
     """
     def __init__(self, model="all-MiniLM-L6-v2"):
        
@@ -164,8 +213,6 @@ class VectorDatabaseSB(VectorDatabase):
         embedding = self.model.encode(text, convert_to_tensor=True)
         return embedding.numpy()
 
-
-
     def query(self, text, date=None, date_type='day', k=5, days_threshold=2):
         """
         Query embeddings for similar vectors. 
@@ -178,22 +225,25 @@ class VectorDatabaseSB(VectorDatabase):
             k (int, optional): The number of most similar vectors to return. Defaults to 5.
             days_threshold (int, optional): The threshold for the date. Defaults to 2.
         """
-        filtered_vectors = {timestamp_key: value for timestamp_key, value in self.vectors.items() 
-                            if date is None or 
-                            (date_type == 'day' and abs((datetime.strptime(timestamp_key, "%Y%m%d%H%M") - datetime.strptime(date, "%Y%m%d")).days) <= days_threshold) or 
-                            (date_type == 'month' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").month == datetime.strptime(date, "%Y%m").month) or 
-                            (date_type == 'year' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").year == int(date))}
         
-        if len(filtered_vectors)==0:
+        if date is not None:
+            nearest_nodes = {timestamp_key: node for timestamp_key, node in self.memory_nodes.items() 
+                        if date is None or 
+                        (date_type == 'day' and abs((datetime.strptime(timestamp_key, "%Y%m%d%H%M") - datetime.strptime(date, "%Y%m%d")).days) <= days_threshold) or 
+                        (date_type == 'month' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").month == datetime.strptime(date, "%Y%m").month) or 
+                        (date_type == 'year' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").year == int(date))}
+        
+        elif date is None or len(nearest_nodes)==0:
             print("No vectors found for the given date.\n Searching entire database....")
-            filtered_vectors = self.vectors
+            nearest_nodes = self.memory_nodes
 
         query_embedding = self.model.encode(text, convert_to_tensor=True)
-        vectors = torch.stack([torch.from_numpy(v['vector']) for v in filtered_vectors.values()])
+        vectors = torch.stack([torch.from_numpy(node.embedding) for node in nearest_nodes.values()])
+        vectors = vectors.type_as(query_embedding)  # Ensure vectors is the same type as query_embedding
         hits = util.semantic_search(query_embedding, vectors, top_k=k)
-        return [(key, hit['score'], filtered_vectors[key]['summary']) for hit in hits[0] for key in [list(filtered_vectors.keys())[hit['corpus_id']]]]
+        return [(key, hit['score'], nearest_nodes[key].summary) for hit in hits[0] for key in [list(nearest_nodes.keys())[hit['corpus_id']]]]
     
-class VectorDatabaseBert(VectorDatabase):
+class MemoryStoreBert(MemoryStoreBase):
     """
     DEPRECATED: A class representing a vector database using BERT model.
 
@@ -251,7 +301,7 @@ class VectorDatabaseBert(VectorDatabase):
         with torch.no_grad():
             outputs = self.model(**inputs)
         query_embedding = outputs.last_hidden_state.mean(dim=1)[0]
-        similarities = [(key, self.cosine_similarity(query_embedding.numpy(), vector)) for key, vector in self.vectors.items()]
+        similarities = [(key, self.cosine_similarity(query_embedding.numpy(), node.embedding)) for key, node in self.memory_nodes.items()]
         similarities.sort(key=lambda x: x[1], reverse=True)
         return similarities[:k]
 
@@ -275,7 +325,7 @@ class VectorDatabaseBert(VectorDatabase):
 import time
 
 if __name__ == '__main__':
-    db1 = VectorDatabaseSB()
+    db1 = MemoryStoreSB()
     
     #genereated with chatgpt
     random_initial_memory = {
@@ -312,10 +362,10 @@ if __name__ == '__main__':
     }
 
 
-    print("Initial memory config")
-    start_time = time.time()
-    db1.pre_seed_memory(data = random_initial_memory, save_path='memory.h5')
-    print('Adding time sb:', time.time() - start_time)
+    # print("Initial memory config")
+    # start_time = time.time()
+    # db1.pre_seed_memory(data = random_initial_memory, save_path='memory.h5')
+    # print('Adding time sb:', time.time() - start_time)
 
     # Load the vectors from files (if needed)
     db1.load('memory.h5')
