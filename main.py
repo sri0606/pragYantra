@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import time
 from dotenv import load_dotenv
 load_dotenv()
@@ -13,7 +14,7 @@ def main():
     parser.add_argument('--offline_mode', action='store_true', help='Whether to run in offline mode. Run the assistant without making network requests. Uses local resources instead.\nDefault is True.')
     parser.add_argument('--interpreter_model', type=str, default='llama3-70B-8192', help='The name of the model to use. For online mode, check models aavailable on https://console.groq.com/docs/models. For offline mode, make sure you have quantized gguf file like llama3_8B.gguf in models folder.')
     parser.add_argument('--speaker_model', type=str, default='pyttsx3', help='The speaker model to use. Available options are pyttsx3, facebook-mms and 11labs(requires online connection).\nDefault is pyttsx3.')
-    
+    parser.add_argument('--no_vision', action='store_true',default=False, help='Whether to enable vision input or not.\nDefault is False.')
     args = parser.parse_args()
     
     if not args.offline_mode:
@@ -36,7 +37,7 @@ def main():
     
     print("\nHello! \nSetting up the pragYantra virtual assistant for you...\n")
     from core.manas import Manas
-    robo = Manas(interpreter_model=args.interpreter_model, offline_mode=args.offline_mode, speaker_model=args.speaker_model)
+    robo = Manas(interpreter_model=args.interpreter_model, offline_mode=args.offline_mode, speaker_model=args.speaker_model,no_vision=args.no_vision)
 
     robo.setup()
     robo.start()
@@ -47,9 +48,12 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\Terminating...\n")
-        # terminate when user presses Ctrl+C,
+        print("\nTerminating...\n")
+    finally:
+        # Ensure termination happens even if an exception occurs
         robo.terminate()
         print("\nSee ya..Bye!")
+        sys.exit(0)  # Ensure a clean exit
+
 if __name__ == "__main__":
     main()
