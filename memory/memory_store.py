@@ -1,44 +1,31 @@
 import torch
 from datetime import datetime
-from typing import Dict, List
-from vector_utils.vector_emb import VectorNode,VectorEmbeddingModel, VectorStore, ModelSource
+from typing import List
+from vector_utils.vector_emb import VectorNode, VectorStore, ModelSource
 
 class MemoryNode(VectorNode):
     """
     Representation of a memory node.
     """
-    def __init__(self, timestamp:str | int, text_embedding: torch.Tensor, summary:str=None):
-        super().__init__(timestamp, text_embedding)
-        self.summary = summary
-    
+    def __init__(self, key: str | int, embedding: torch.Tensor, **kwargs):
+        """
+        Args:
+
+            key (str): The timestamp key to associate with the vector. (timestamp YYmmddHHMM (minutes can either be 00 or 30 as memory is added every 30mins))
+        """
+        super().__init__(key, embedding, **kwargs)
+
     def __str__(self):
-        return f"MemoryNode: {self.format_timestamp(self.key)} - {self.summary}"
-    
+        summary = self.kwargs.get('summary', 'No summary')
+        return f"MemoryNode: {self.format_timestamp(self.key)} - {summary}"
+
     def __repr__(self):
-        return f"MemoryNode('{self.key}','{self.embedding}', '{self.summary}')"
-    
+        summary = self.kwargs.get('summary', '')
+        return f"MemoryNode('{self.key}', '{self.embedding}', '{summary}')"
+
     @staticmethod
     def format_timestamp(timestamp):
         return f"{timestamp[6:8]}/{timestamp[4:6]}/{timestamp[:4]} {timestamp[8:10]}:{timestamp[10:12]}"
-    
-    def to_dict(self):
-        """
-        Extends the parent's to_dict method to include the 'summary' attribute.
-        """
-        data = super().to_dict()
-        data['summary'] = self.summary
-        return data
-
-    @classmethod
-    def from_dict(cls, data):
-        """
-        Extends the parent's from_dict method to include the 'summary' attribute.
-        """
-        # First, call the parent's from_dict to handle common attributes
-        instance = super().from_dict(data)
-        # Then, add the child-specific attribute
-        instance.summary = data['summary']
-        return instance
 
 
 class MemoryStore(VectorStore):
@@ -49,17 +36,9 @@ class MemoryStore(VectorStore):
         """
         Args:
             embedding_model (str): The identifier of the embedding model to use. Defaults to "all-MiniLM-L6-v2".
-            from_huggingface (bool, optional): Whether to load the model from Hugging Face. Defaults to False.
-            from_sbert (bool, optional): Whether to load the model from Sentence Transformers. Defaults to False.
+            model_source (ModelSource, optional): The source of the embedding model. Defaults to ModelSource.SBERT.
         """
-        if isinstance(embedding_model, str):
-            self.embedding_model = VectorEmbeddingModel(model_identifier=embedding_model, model_source=model_source)
-        else:
-            self.embedding_model = embedding_model
-
-        super().__init__(MemoryNode)
-        # Memory nodes is a dictionary with timestamp as key and MemoryNode as value
-        self.vector_nodes:Dict[str, MemoryNode] = {}
+        super().__init__(embedding_model,model_source,node_type=MemoryNode)
         
 
     def __getitem__(self, key) -> MemoryNode | List[MemoryNode]:
@@ -78,18 +57,18 @@ class MemoryStore(VectorStore):
             return summaries
     
 
-    def add_vector(self, timestamp_key, text, summary=None):
+    def add_vector(self, key, text, summary=None):
         """
         Adds a vector to the database.
 
         Args:
-            timestamp_key (str): The timestamp key to associate with the vector. (timestamp YYmmddHHMM (minutes can either be 00 or 30 as memory is added every 30mins))
+            key (str): The timestamp key to associate with the vector. (timestamp YYmmddHHMM (minutes can either be 00 or 30 as memory is added every 30mins))
             text (str): The text to vectorize and add to the database.
             summary (list, optional): The summary associated with the vector. Defaults to None.
         """
         preprocess_text = self.preprocess_text(text, threshold_length=100)
         vector_emb = self.vectorize_text(preprocess_text)
-        self.vector_nodes[timestamp_key] = MemoryNode(timestamp=timestamp_key, summary=summary, text_embedding=vector_emb)
+        self.vector_nodes[key] = MemoryNode(key=key, embedding=vector_emb, summary=summary)
 
     def pre_seed_memory(self, data: dict, save_path=None):
         """
@@ -103,7 +82,7 @@ class MemoryStore(VectorStore):
             raise ValueError("Data must be a non-empty dictionary.")
 
         for timestamp,(summary,text)  in data.items():
-            self.add_vector(timestamp_key=timestamp, text=text,summary=summary )
+            self.add_vector(key=timestamp, text=text,summary=summary )
         if save_path:
             self.save(save_path)
 
@@ -144,8 +123,8 @@ class MemoryStore(VectorStore):
 import time
 
 if __name__ == '__main__':
-    # db_hf = MemoryStore(embedding_model="bert-base-uncased",model_source=ModelSource.HUGGINGFACE)
-    db_sbert = MemoryStore(embedding_model="all-MiniLM-L6-v2",model_source=ModelSource.SBERT)
+    # db = MemoryStore(embedding_model="bert-base-uncased",model_source=ModelSource.HUGGINGFACE)
+    db = MemoryStore(embedding_model="all-MiniLM-L6-v2",model_source=ModelSource.SBERT)
     #genereated with chatgpt
     random_initial_memory = {
         '202303261530': ('Family Vacation to Italy',
@@ -181,13 +160,13 @@ if __name__ == '__main__':
     }
 
 
-    print("Initial memory config")
-    start_time = time.time()
-    db_sbert.pre_seed_memory(data = random_initial_memory, save_path='memory_bert.h5')
-    print('Adding time sb:', time.time() - start_time)
+    # print("Initial memory config")
+    # start_time = time.time()
+    # db.pre_seed_memory(data = random_initial_memory, save_path='memory.h5')
+    # print('Adding time sb:', time.time() - start_time)
 
     # Load the vectors from files (if needed)
-    db_sbert.load('memory.h5')
+    db.load('memory.h5')
 
     # Example queries
     query_texts = [
@@ -200,7 +179,7 @@ if __name__ == '__main__':
     for i,query in enumerate(query_texts):
 
         start_time = time.time()
-        results1 = db_sbert.query(query,date=dates[i],date_type='year', k=3)
+        results1 = db.query(query,date=dates[i],date_type='year', k=3)
         print('Query time:', time.time() - start_time, f". Results for '{query}':")
         for result in results1:
             print(result[1], result[0].summary)
