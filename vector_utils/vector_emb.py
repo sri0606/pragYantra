@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List,Dict
 import base64
 import pickle
 import h5py
@@ -19,17 +19,29 @@ class VectorNode:
     """
     Base representation of a vector node.
     """
-    def __init__(self, key: str | int, embedding: torch.Tensor):
+    def __init__(self, key: str | int, embedding: torch.Tensor,**kwargs)->None:
         self.key = key
         self.embedding = embedding
+        self.kwargs = kwargs
 
-    def to_dict(self):
+    def __getattr__(self, item):
+        """
+        Allows accessing kwargs directly as attributes.
+        """
+        try:
+            return self.kwargs[item]
+        except KeyError:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
+        
+    def to_dict(self)->dict:
         """
         Returns a dictionary representation of the Node object.
         """
         data = {
             'key': self.key,
-            'embedding': self.embedding.tolist()
+            'embedding': self.embedding.tolist(),
+            # Include any extra attributes
+            **self.kwargs
         }
         return data
     
@@ -38,8 +50,9 @@ class VectorNode:
         """
         Creates a Node object from a dictionary.
         """
-        tensor_embedding = torch.tensor(data['embedding'], dtype=torch.float32)
-        return cls(data['key'], tensor_embedding)
+        key = data.pop('key')
+        embedding = torch.tensor(data.pop('embedding'), dtype=torch.float32)
+        return cls(key, embedding, **data)
     
     
 class VectorEmbeddingModel:
@@ -81,7 +94,7 @@ class VectorEmbeddingModel:
                 outputs = model(**inputs)
             # Extract embeddings (e.g., last hidden state)
             embeddings = outputs.last_hidden_state.mean(dim=1)[0]
-            return embeddings.numpy()
+            return embeddings
         
         elif self.model_source == ModelSource.SBERT:
             return self.model.encode(text,convert_to_tensor=True, **kwargs)
@@ -103,31 +116,30 @@ class VectorEmbeddingModel:
         Returns:
             List[Tuple[VectorNode, float]]: The list of VectorNode objects and their cosine similarity scores.
         """
-        if self.model_source == ModelSource.HUGGINGFACE:
-            similarities = [(node, self.cosine_similarity(query_embedding, node.embedding)) for node in vector_nodes]
-            similarities.sort(key=lambda x: x[1], reverse=True)
-            return similarities[:top_k]
+        # if self.model_source == ModelSource.HUGGINGFACE:
+        similarities = [(node, self.cosine_similarity(query_embedding, node.embedding)) for node in vector_nodes]
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return similarities[:top_k]
         
-        elif self.model_source == ModelSource.SBERT:
-            search_results = util.semantic_search(query_embedding, torch.stack([node.embedding for node in vector_nodes]), top_k=top_k, **kwargs)
-                # Map the search results to VectorNode objects and their scores
-            node_scores = [(vector_nodes[result['corpus_id']], result['score']) for result in search_results[0]]
+        # elif self.model_source == ModelSource.SBERT:
+        #     search_results = util.semantic_search(query_embedding, torch.stack([node.embedding for node in vector_nodes]), top_k=top_k, **kwargs)
+        #         # Map the search results to VectorNode objects and their scores
+        #     node_scores = [(vector_nodes[result['corpus_id']], result['score']) for result in search_results[0]]
             
-            return node_scores
+        #     return node_scores
         
-        else:
-            # Perform semantic search for non-Hugging Face models
-            raise NotImplementedError("Performing semantic search for this model is not yet implemented yet. You can implement it here.")
+        # else:
+        #     # Perform semantic search for non-Hugging Face models
+        #     raise NotImplementedError("Performing semantic search for this model is not yet implemented yet. You can implement it here.")
 
     @staticmethod
-    def cosine_similarity(vector1, vector2):
+    def cosine_similarity(vector1:torch.Tensor, vector2:torch.Tensor):
         """
         Computes the cosine similarity between two vectors.
-        Adjusted to handle 1D and 2D tensors for both vector1 and vector2.
         """
-        dot_product = torch.dot(torch.tensor(vector1), torch.tensor(vector2))
-        norm1 = torch.norm(torch.tensor(vector1))
-        norm2 = torch.norm(torch.tensor(vector2))
+        dot_product = torch.dot(vector1,vector2)
+        norm1 = torch.norm(vector1)
+        norm2 = torch.norm(vector2)
         return dot_product / (norm1 * norm2)
     
 class VectorStore:
@@ -135,8 +147,20 @@ class VectorStore:
     An implementation of Vector Database. A base class for a vector store that manages a collection of vector nodes.
     """
     
-    def __init__(self,node_type):
+    def __init__(self, embedding_model="all-MiniLM-L6-v2",model_source = ModelSource.SBERT,node_type=VectorNode):
+        """
+        Args:
+            embedding_model (str): The identifier of the embedding model to use. Defaults to "all-MiniLM-L6-v2".
+            model_source (ModelSource, optional): The source of the embedding model. Defaults to ModelSource.SBERT.
+            node_type (VectorNode, optional): The type of the node to store. Defaults to VectorNode.
+        """
+        if isinstance(embedding_model, str):
+            self.embedding_model = VectorEmbeddingModel(model_identifier=embedding_model, model_source=model_source)
+        else:
+            self.embedding_model = embedding_model
+
         self.node_type = node_type
+        self.vector_nodes:Dict[str, node_type] = {}
         self.summarizer = Summarizer()
 
     def __str__(self):
@@ -214,12 +238,26 @@ class VectorStore:
         embedding = self.embedding_model.compute_sentence_embeddings(text)
         return embedding
     
-    def add_vector(self):
+    def add_vector(self, text,key=None, **kwargs):
         """
         Adds a vector to the database.
+
+        Args:
+            key (str): unique_key
+            text (str): The text to vectorize and add to the database.
+            summary (list, optional): The summary associated with the vector. Defaults to None.
         """
-        raise NotImplementedError("VectorDatabase.add_vector method is not implemented")
+        if key is None:
+            key = str(len(self.vector_nodes))
+
+        preprocess_text = self.preprocess_text(text, threshold_length=100)
+        vector_emb = self.vectorize_text(preprocess_text)
+        self.vector_nodes[key] = self.node_type(key, vector_emb,**kwargs)
     
-    def query(self, text, date=None, date_type='day', k=5, days_threshold=2):
-        raise NotImplementedError("VectorDatabase.query method is not implemented")
+    def query(self, text, k=5,**kwargs):
+        query_emb = self.vectorize_text(text)
+
+        hits = self.embedding_model.semantic_search(query_emb,list(self.vector_nodes.values()), top_k=k, **kwargs)
+
+        return hits
     
