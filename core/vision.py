@@ -9,9 +9,10 @@ class LiveVision:
         """
         Constructor
         """
-        self._eyes = VisionAid(stop_event_wait_time=5, save_to_json_interval=3)
+        self._aid = VisionAid(stop_event_wait_time=30, save_to_json_interval=3)
         self._thread = None
         self._stop_event = threading.Event()
+        self.previous_context = ""
 
     def start(self):
         """
@@ -20,12 +21,29 @@ class LiveVision:
         if self._thread is not None and self._thread.is_alive():
           print("Vision is already running")
           return
-        self._eyes.set_blind(False)
-        self._thread = threading.Thread(target=self._eyes.get_visual_context, args=(self._stop_event,))
+        self._aid.set_blind(False)
+        self._thread = threading.Thread(target=self._aid.get_visual_context, args=(self._stop_event,))
         self._thread.start()
 
         print("Vision thread started")
 
+    def get_previous_current_context(self):
+        """
+        Get the previous and current context.
+
+        Returns:
+            tuple: A tuple containing the previous and current context.
+        """
+        previous_context = self.previous_context
+        current_context = self._aid.current_seen
+        
+        # Update previous context with current value
+        self.previous_context = current_context
+        
+        # Clear current context
+        self._aid.current_seen = ""
+        
+        return previous_context, current_context
 
     def terminate(self):
         """
@@ -33,7 +51,7 @@ class LiveVision:
         """
         if self._thread is None or not self._thread.is_alive():
             return
-        self._eyes.set_blind(True)
+        self._aid.set_blind(True)
         # Signal the Vision thread to stop
         self._stop_event.set()
 
