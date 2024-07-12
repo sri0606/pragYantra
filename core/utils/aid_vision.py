@@ -3,11 +3,11 @@ import torch
 from torchvision import transforms
 from PIL import Image as PILImage
 from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
-from datetime import datetime, timedelta
-import json
+from datetime import datetime
 import os
 import numpy as np
-from .. import MODELS_DIR, MEMORY_STREAM_DIR
+from collections import deque
+from .. import MODELS_DIR
 # def get_classifier_labels():
 #     """
 #     Get the classifier labels
@@ -96,18 +96,6 @@ class ImageProcessor:
         Detect text in the image
         """
         pass
-
-    def get_context(self,image_data):
-        """
-        Get the context of the visuals
-        """
-        max_length = 16
-        num_beams = 4
-        gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
-
-        visual_context = self.__predict_image_caption(image_data,gen_kwargs)
-
-        return visual_context
     
 
     def numpy_to_pil(self, image, rescale=None):
@@ -136,35 +124,51 @@ class ImageProcessor:
             return PILImage.fromarray(image)
         return image
     
-    def __predict_image_caption(self, image_data, gen_kwargs):
+    def prepare_image(self, image_data):
         """
-        Predicts image captions for a list of image data.
-
-        Args:
-            image_data_list (list): A list of image data.
-            gen_kwargs (dict): Keyword arguments for the caption generation.
-
-        Returns:
-            list: A list of predicted image captions.
+        Prepares the image data for model input
         """
-
         pil_image = self.numpy_to_pil(image_data)
-
         pixel_values = self.feature_extractor(images=[pil_image], return_tensors="pt").pixel_values
-        pixel_values = pixel_values.to(self.device)
+        return pixel_values.to(self.device)
 
-        output_ids = self.model.generate(pixel_values, **gen_kwargs,pad_token_id=self.tokenizer.eos_token_id)
+    def get_context_and_embedding(self, image_data):
+        """
+        Get both the context (image caption) and embedding for the given image data.
+        """
+        pixel_values = self.prepare_image(image_data)
 
+        # Generate caption
+        max_length = 16
+        num_beams = 4
+        gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
+
+        with torch.no_grad():
+            # Get encoder output for embedding
+            encoder_output = self.model.encoder(pixel_values)
+            
+            # Generate caption
+            output_ids = self.model.generate(
+                encoder_outputs=encoder_output,
+                **gen_kwargs,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+
+        # Process caption
         preds = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)
-        preds = [pred.strip() for pred in preds]
-        return preds
+        context = [pred.strip() for pred in preds]
 
+        # Process embedding
+        image_embedding = torch.mean(encoder_output.last_hidden_state, dim=1)
+        embedding = image_embedding.cpu().numpy().squeeze()
+
+        return context, embedding
 
 class VisionAid:
     """
     VisionAid class to handle all vision related tasks
     """
-    def __init__(self,stop_event_wait_time=5, save_to_json_interval=3):
+    def __init__(self,stop_event_wait_time=5, save_to_json_interval=3,buffer_size=30):
         """
         Initialize the VisionAid class.
 
@@ -176,6 +180,8 @@ class VisionAid:
         self.save_to_json_interval = save_to_json_interval
         self._camera = None
         self.image_processor = ImageProcessor()
+        self.memory_buffer = deque(maxlen=buffer_size)
+        self.current_seen = ""
 
     def __capture_image(self):
         """
@@ -216,6 +222,20 @@ class VisionAid:
             cv2.imwrite(save_path, frame)  # Save the image to the specified path
         return frame
 
+    def get_recent_context(self,relevance_threshold=300):
+        """
+        Get the recent context from the vision logs buffer.
+
+        Parameters:
+        relevance_threshold (int): The relevance threshold in seconds. Default is None.
+        """
+        now = datetime.now()
+        recent_captions = [
+            text for timestamp, text in self.memory_buffer
+            if (now - timestamp).total_seconds() <= relevance_threshold
+        ]
+        return "\n".join(recent_captions)
+    
     def get_visual_context(self, stop_event):
         """
         Get the visual context.
@@ -230,50 +250,14 @@ class VisionAid:
         Returns:
             None
         """
-        vision_log_dir_path = os.path.join(MEMORY_STREAM_DIR,"vision_logs/")
-
-        # Initialize a timer
-        next_save_time = datetime.now() + timedelta(seconds=0)
-        vision_log = {}
-
         while not stop_event.is_set():
             now = datetime.now()
-            current_hour = now.strftime("%H")
         
             image = self.get_image()
 
-            context = self.__get_context_from_image(image)
-            vision_log[current_hour] = [(now.strftime("%H%M%S"),context)]
+            self.current_seen = self.__get_context_from_image(image)
+            self.memory_buffer.append((now, self.current_seen))
 
-            if current_hour not in vision_log:
-                    vision_log[current_hour] = []
-
-            if now >= next_save_time:
-                date_string = now.strftime("%Y%m%d")
-                filename = f"{date_string}_vision.json"
-                filepath = os.path.join(vision_log_dir_path, filename)
-
-                if os.path.exists(filepath):
-                    with open(filepath, 'r') as f:
-                        if f.read().strip():
-                            f.seek(0)  # reset file pointer to beginning
-                            existing_data = json.load(f)
-                        else:
-                            existing_data = {}
-                else:
-                    existing_data = {}
-
-                if current_hour not in existing_data:
-                    existing_data[current_hour] = []
-
-                existing_data[current_hour].extend(vision_log[current_hour])
-
-                with open(filepath, 'w') as f:
-                    json.dump(existing_data, f)
-
-                vision_log[current_hour].clear()
-
-                next_save_time = now + timedelta(seconds=self.save_to_json_interval)
             # Wait for 5 seconds or until the stop event is set
             stop_event.wait(self.stop_event_wait_time)    
 
@@ -281,7 +265,7 @@ class VisionAid:
         """
         Get the context of the visuals
         """
-        contexts = self.image_processor.get_context(images_data)
+        contexts,emb = self.image_processor.get_context_and_embedding(images_data)
         return contexts
     
     def __del__(self):

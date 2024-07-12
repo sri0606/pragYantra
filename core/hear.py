@@ -1,5 +1,5 @@
 import threading
-from .utils.aid_hear import live_transcribe, TalkingState
+from .utils.aid_hear import AudioProcessor
 
 class LiveTranscriber:
     """
@@ -12,11 +12,9 @@ class LiveTranscriber:
     """
 
     def __init__(self):
-      self._thread = None
       self._stop_event = threading.Event()
-      self._pause_event = threading.Event()
-      self._pause_event.clear()  # Initially set the event, so the transcription starts immediately
-      self.talking_state = TalkingState()
+      self._aid = AudioProcessor(model="base")
+      self.previous_transcription = ""
 
     def start(self):
       """
@@ -25,15 +23,27 @@ class LiveTranscriber:
       If the transcription is already running, it prints a message and returns.
       Otherwise, it creates a new thread and starts the live_transcribe function.
       """
-      if self._thread is not None and self._thread.is_alive():
-        print("Transcription is already running")
-        return
 
-      self._thread = threading.Thread(target=live_transcribe, 
-                      kwargs={'model': 'base', 'non_english': False,'stop_event': self._stop_event,
-                              'talking_state':self.talking_state, 'pause_event': self._pause_event,})
-      self._thread.start()
+      self._aid.start_processing()
       print("Transcribing thread started.")
+
+    def get_previous_current_transcription(self):
+      """
+      Get the previous and current transcription.
+
+      Returns:
+          tuple: A tuple containing the previous and current transcription.
+      """
+      previous_transcription = self.previous_transcription
+      current_transcription = self._aid.current_transcription
+      
+      # Update previous transcription with current value
+      self.previous_transcription = current_transcription
+      
+      # Clear current transcription
+      self._aid.current_transcription = ""
+      
+      return previous_transcription, current_transcription
 
     def is_voice_detected(self):
         """
@@ -42,28 +52,23 @@ class LiveTranscriber:
         Returns:
             bool: True if vad, False otherwise.
         """
-        return self.talking_state.is_someone_talking()
+        return self._aid.external_speech_detected.is_set()
     
-    def get_pause_event(self):
-        """
-        Returns the pause event.
 
-        Returns:
-            threading.Event: The pause event.
-        """
-        return self._pause_event
+    def is_listening(self):
+       return self._aid.transcribing_event.is_set()
     
     def pause(self):
         """
         Pause transcription.
         """
-        self._pause_event.clear()
+        self._aid.pause_transcription()
 
     def resume(self):
         """
         Resume transcription.
         """
-        self._pause_event.set()
+        self._aid.resume_transcription()
 
     def terminate(self):
       """
@@ -73,15 +78,16 @@ class LiveTranscriber:
       Otherwise, it signals the transcription thread to stop, waits for it to finish,
       and resets the stop event so that transcription can be started again.
       """
-      if self._thread is None or not self._thread.is_alive():
-        print("Transcriber is not running")
-        return
+      # if self._thread is None or not self._thread.is_alive():
+      #   print("Transcriber is not running")
+      #   return
 
+      self._aid.stop_processing()
       # Signal the transcription thread to stop
       self._stop_event.set()
 
       # Wait for the transcription thread to finish
-      self._thread.join(timeout=1.0)
+      # self._thread.join(timeout=1.0)
 
       # Reset the stop event so we can start the transcription again
       self._stop_event.clear()
