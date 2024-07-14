@@ -2,6 +2,7 @@ import torch
 from datetime import datetime
 from typing import List
 from vector_utils.vector_emb import VectorNode, VectorStore, ModelSource
+from . import verbose_print
 
 class MemoryNode(VectorNode):
     """
@@ -107,7 +108,7 @@ class MemoryStore(VectorStore):
                         (date_type == 'year' and datetime.strptime(timestamp_key, "%Y%m%d%H%M").year == int(date))]
         
         elif date is None or len(nearest_nodes)==0:
-            print("No vectors found for the given date. Searching entire database....")
+            verbose_print("No vectors found for the given date. Searching entire database....")
             nearest_nodes = None
 
         query_emb = self.vectorize_text(text)
@@ -160,10 +161,10 @@ if __name__ == '__main__':
     }
 
 
-    # print("Initial memory config")
+    # verbose_print("Initial memory config")
     # start_time = time.time()
     # db.pre_seed_memory(data = random_initial_memory, save_path='memory.h5')
-    # print('Adding time sb:', time.time() - start_time)
+    # verbose_print('Adding time sb:', time.time() - start_time)
 
     # Load the vectors from files (if needed)
     db.load('memory.h5')
@@ -180,7 +181,7 @@ if __name__ == '__main__':
 
         start_time = time.time()
         results1 = db.query(query,date=dates[i],date_type='year', k=3)
-        print('Query time:', time.time() - start_time, f". Results for '{query}':")
+        verbose_print('Query time:', time.time() - start_time, f". Results for '{query}':")
         for result in results1:
-            print(result[1], result[0].summary)
-        print("\n")
+            verbose_print(result[1], result[0].summary)
+        verbose_print("\n")

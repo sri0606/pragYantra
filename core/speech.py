@@ -10,7 +10,7 @@ import time
 from collections import deque
 from datetime import datetime
 from .hear import LiveTranscriber
-from . import MEMORY_STREAM_DIR
+from . import MEMORY_STREAM_DIR, verbose_print
 
 
 class LiveSpeech:
@@ -67,7 +67,7 @@ class LiveSpeech:
         """
         pygame.mixer.music.load(filename)
         self.transcriber.pause()
-        print("Pause hearing ability!")
+        verbose_print("Pause hearing ability!")
 
         pygame.mixer.music.play()
 
@@ -80,7 +80,7 @@ class LiveSpeech:
         time.sleep(0.5)
         
         self.transcriber.resume()
-        print("Resume hearing ability!")
+        verbose_print("Resume hearing ability!")
 
     def start(self):
         """
@@ -167,7 +167,7 @@ class LiveSpeech:
                 except Exception as e:
                     #if error occured, it most probably means that the file is still being used by speech thread
                     continue
-                    # print(f'Failed to delete {file_path}. Reason: {e}')
+                    # verbose_print(f'Failed to delete {file_path}. Reason: {e}')
 
     def terminate(self):
         """

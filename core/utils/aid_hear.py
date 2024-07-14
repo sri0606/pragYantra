@@ -8,13 +8,7 @@ import whisper
 import torch
 import os
 import re
-
-import numpy as np
-import threading
-
-import numpy as np
-from collections import deque
-import threading
+from .. import verbose_print
 
 class AudioData:
     def __init__(self, sample_rate, buffer_duration=10, vad_window_size=0.096):
@@ -252,7 +246,7 @@ class AudioProcessor:
     def _process_audio(self):
         def audio_callback(indata, frames, time_info, status):
             if status:
-                print(f"Error in audio stream: {status}")
+                verbose_print(f"Error in audio stream: {status}")
             
             audio_np = indata.flatten().astype(np.float32)
             self.audio_data.add_data(audio_np, self.transcribing_event.is_set())                
@@ -289,7 +283,7 @@ class AudioProcessor:
         # Check for speech
         if not self.last_speech_time or current_time - self.last_speech_time > self.detection_window:
             if audio_level_db > self.background_energy + self.energy_threshold_db:
-                print(f"External speech detected! Energy: {audio_level_db:.2f} dB, Avg: {avg_energy:.2f} dB, Background: {self.background_energy:.2f} dB")
+                verbose_print(f"External speech detected! Energy: {audio_level_db:.2f} dB, Avg: {avg_energy:.2f} dB, Background: {self.background_energy:.2f} dB")
                 self.external_speech_detected.set()
                 self.consecutive_silence = 0
                 self._set_speech_detected_properties(current_time)
@@ -307,7 +301,7 @@ class AudioProcessor:
         else:
             vad_is_speech = None
             speech_prob = 0
-            print("Not enough data for VAD")
+            verbose_print("Not enough data for VAD")
 
         is_not_silent = audio_level_db > self.silence_threshold_db or vad_is_speech
 
@@ -319,23 +313,23 @@ class AudioProcessor:
 
         if not self.speech_ongoing:
             if is_speech_majority:
-                print(f"Speech detected: Audio level: {audio_level_db:.2f} dB, VAD prob: {speech_prob:.2f}")
+                verbose_print(f"Speech detected: Audio level: {audio_level_db:.2f} dB, VAD prob: {speech_prob:.2f}")
                 self._set_speech_detected_properties(current_time)
         elif not self.end_of_speech_detected.is_set():
             if self._check_eos():
                 self._set_end_of_speech_properties(current_time)
-                print("End of speech detected.")
+                verbose_print("End of speech detected.")
 
         # Check if we should transcribe
         if self.end_of_speech_detected.is_set() and transcribe_duration > self.min_audio_length:
             enough_time_since_last_eos = self.last_eos_time and (current_time - self.last_eos_time) > self.post_speech_wait_time
 
             if enough_time_since_last_eos or transcribe_duration > self.max_audio_length:
-                print(f"Transcribing. Duration: {transcribe_duration:.2f}s")
+                verbose_print(f"Transcribing. Duration: {transcribe_duration:.2f}s")
                 self._transcribe()
         
         elif not is_speech_majority and transcribe_duration > self.max_audio_length*3:
-            print(f"Max duration reached. Clearing buffer. Duration: {transcribe_duration:.2f}s")
+            verbose_print(f"Max duration reached. Clearing buffer. Duration: {transcribe_duration:.2f}s")
             self.audio_data.clear_transcribing_data()
 
     def _transcribe(self):
@@ -371,7 +365,7 @@ class AudioProcessor:
         if completed_phrase:
             self.memory_buffer.append((datetime.now(), completed_phrase))
             self.current_transcription += completed_phrase + " "
-            print(f"Phrase completed: {completed_phrase}")
+            verbose_print(f"Phrase completed: {completed_phrase}")
             self.text_chunks = ""
 
     def is_ready_for_processing(self):
@@ -392,7 +386,7 @@ class AudioProcessor:
         self.external_speech_detected.clear()
         self.speech_ongoing = False
         self.end_of_speech_detected.clear()
-        print("Transcription resumed")
+        verbose_print("Transcription resumed")
 
     def force_complete_phrase(self):
         """Force completion of the current phrase"""

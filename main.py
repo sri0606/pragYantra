@@ -8,6 +8,7 @@ import logging
 from transformers import logging as hf_logging
 logging.basicConfig(level=logging.ERROR)
 hf_logging.set_verbosity_error()
+from config import Config
 
 def main():
     parser = argparse.ArgumentParser(description='pragYantra')
@@ -15,6 +16,7 @@ def main():
     parser.add_argument('--interpreter_model', type=str, default='llama3-70B-8192', help='The name of the model to use. For online mode, check models aavailable on https://console.groq.com/docs/models. For offline mode, make sure you have quantized gguf file like llama3_8B.gguf in models folder.')
     parser.add_argument('--speaker_model', type=str, default='pyttsx3', help='The speaker model to use. Available options are pyttsx3, facebook-mms and 11labs(requires online connection).\nDefault is pyttsx3.')
     parser.add_argument('--no_vision', action='store_true',default=False, help='Whether to enable vision input or not.\nDefault is False.')
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     args = parser.parse_args()
     
     if not args.offline_mode:
@@ -34,10 +36,11 @@ def main():
         speech_key = os.getenv('SPEECH_KEY')
         if speech_key is None:
             raise EnvironmentError("Please set the SPEECH_KEY environment variable in a '.env' file to use Eleven Labs for speech model.")
-    
+    Config.set_verbose(args.verbose)
     print("\nHello! \nSetting up the pragYantra virtual assistant for you...\n")
     from core.manas import Manas
-    robo = Manas(interpreter_model=args.interpreter_model, offline_mode=args.offline_mode, speaker_model=args.speaker_model,no_vision=args.no_vision)
+    robo = Manas(interpreter_model=args.interpreter_model, offline_mode=args.offline_mode, 
+                 speaker_model=args.speaker_model,no_vision=args.no_vision)
 
     robo.setup()
     robo.start()

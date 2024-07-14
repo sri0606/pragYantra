@@ -9,7 +9,7 @@ from memory.memory import LiveMemory
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
-from . import MODELS_DIR, ENV_PATH
+from . import MODELS_DIR, ENV_PATH, verbose_print
 
 
 load_dotenv(ENV_PATH)
@@ -234,7 +234,7 @@ class Manas:
         else:
             vision_prompt = "Vision is not available."
 
-        print(latest_audio)
+        verbose_print(latest_audio)
   
         prompt = f"""
         You are like a virtual brain of a human processing multiple inputs from different sources like ears, and possibly eyes. You can hear, speak, and understand the world around you. If vision is available, you can also see.

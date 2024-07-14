@@ -1,4 +1,5 @@
 import os
+from utils import verbose_print
 
 # path to your models directory
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
@@ -7,3 +8,4 @@ MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
 MEMORY_STREAM_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "memory_stream")
 
 ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+
