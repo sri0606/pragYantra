@@ -24,6 +24,7 @@ scipy
 seaborn
 SpeechRecognition==3.10.1
 tensorflow
+text-to-action
 torch
 torchaudio
 torchvision
