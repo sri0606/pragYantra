@@ -116,18 +116,17 @@ class VectorEmbeddingModel:
         Returns:
             List[Tuple[VectorNode, float]]: The list of VectorNode objects and their cosine similarity scores.
         """
-        # if self.model_source == ModelSource.HUGGINGFACE:
-        similarities = [(node, self.cosine_similarity(query_embedding, node.embedding)) for node in vector_nodes]
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        return similarities[:top_k]
         
-        # elif self.model_source == ModelSource.SBERT:
-        #     search_results = util.semantic_search(query_embedding, torch.stack([node.embedding for node in vector_nodes]), top_k=top_k, **kwargs)
-        #         # Map the search results to VectorNode objects and their scores
-        #     node_scores = [(vector_nodes[result['corpus_id']], result['score']) for result in search_results[0]]
+        if self.model_source == ModelSource.SBERT:
+            search_results = util.semantic_search(query_embedding, torch.stack([node.embedding for node in vector_nodes]), top_k=top_k, **kwargs)
+                # Map the search results to VectorNode objects and their scores
+            node_scores = [(vector_nodes[result['corpus_id']], result['score']) for result in search_results[0]]
             
-        #     return node_scores
-        
+            return node_scores
+        else: # self.model_source == ModelSource.HUGGINGFACE:
+            similarities = [(node, self.cosine_similarity(query_embedding, node.embedding)) for node in vector_nodes]
+            similarities.sort(key=lambda x: x[1], reverse=True)
+            return similarities[:top_k]
         # else:
         #     # Perform semantic search for non-Hugging Face models
         #     raise NotImplementedError("Performing semantic search for this model is not yet implemented yet. You can implement it here.")
